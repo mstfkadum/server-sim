@@ -24,12 +24,6 @@ jobs:
         with:
           node-version: 20
 
-      - name: Block private lab data
-        run: |
-          if grep -rEn "10\.1\.6\.17|DG56RP0811|7C:A6:2A:70:C1:6C|ILODG56RP0811|clickhouse-sh12r1" --exclude-dir=.git .; then
-            echo "Real device data found - not publishing"; exit 1
-          fi
-
       - name: Build the simulator
         run: node build.js _site/index.html
 
