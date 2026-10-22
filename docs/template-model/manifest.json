@@ -1,0 +1,1 @@
+{ "id": "template-model", "name": "Template server (example)", "vendor": "Example", "summary": "A minimal pack to copy", "defaultScenario": "demo", "files": ["demo.js"] }

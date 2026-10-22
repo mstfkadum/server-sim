@@ -1,0 +1,58 @@
+{
+  "id": "hpe-dl380-gen11-sff",
+  "name": "HPE ProLiant DL380 Gen11 SFF",
+  "vendor": "HPE",
+  "summary": "2U, 24 x 2.5-inch SFF drive bays (3 boxes of 8), two Intel Xeon (4th Gen), DDR5, iLO 6",
+  "defaultScenario": "install",
+  "files": [
+    "assets.js",
+    "model.js",
+    "views-front.js",
+    "views-rack.js",
+    "views-chassis.js",
+    "views-cpu.js",
+    "views-cpurep.js",
+    "views-mem.js",
+    "views-rdist.js",
+    "views-cable.js",
+    "views-ilo.js",
+    "views-web.js",
+    "views-os.js",
+    "scenarios.js"
+  ],
+  "scorm": {
+    "title": "Server build trainer: HPE ProLiant DL380 Gen11 SFF",
+    "passMark": 70,
+    "pointsPerMistake": 10,
+    "lessons": [
+      {
+        "scenario": "install",
+        "title": "HPE Lab 1: New build: rack, processor, memory, drives, iLO"
+      },
+      {
+        "scenario": "cpurep",
+        "title": "HPE Lab 2: Maintenance: replace processor 2, reusing its heatsink"
+      },
+      {
+        "scenario": "ramdist",
+        "title": "HPE Lab 3: RAM Distributor practice: plan the memory for a capacity"
+      },
+      {
+        "scenario": "ramexam",
+        "title": "HPE Lab 4: RAM Distributor exam: a random work order, graded"
+      },
+      {
+        "scenario": "os-ubuntu",
+        "title": "HPE Lab 5: OS install over iLO virtual media: Ubuntu Server 24.04"
+      },
+      {
+        "scenario": "os-rocky",
+        "title": "HPE Lab 6: OS install over iLO virtual media: Rocky Linux 9.5"
+      },
+      {
+        "scenario": "os-esxi",
+        "title": "HPE Lab 7: OS install over iLO virtual media: VMware ESXi 8.0 U3"
+      }
+    ]
+  }
+}

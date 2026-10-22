@@ -1,0 +1,12 @@
+# build output, recreated by build.js / build-scorm.js
+dist/
+_site/
+out/
+scorm/
+*.zip
+
+# installed packages and system files
+node_modules/
+.DS_Store
+Thumbs.db
+*.log

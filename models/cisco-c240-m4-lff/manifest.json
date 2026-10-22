@@ -1,0 +1,82 @@
+{
+  "id": "cisco-c240-m4-lff",
+  "name": "Cisco UCS C240 M4 LFF",
+  "vendor": "Cisco",
+  "summary": "2U, 12 x 3.5-inch drive bays, two Intel Xeon E5-2600 v4, Cisco IMC",
+  "defaultScenario": "install",
+  "files": [
+    "assets.js",
+    "assets-psu.js",
+    "assets-latch.js",
+    "assets-cable.js",
+    "model.js",
+    "views1.js",
+    "views-rdist.js",
+    "views2.js",
+    "views-cable.js",
+    "views-psu.js",
+    "views3.js",
+    "views4.js",
+    "views-os.js",
+    "scenarios.js"
+  ],
+  "scorm": {
+    "title": "Server build trainer: Cisco UCS C240 M4 LFF",
+    "passMark": 70,
+    "pointsPerMistake": 10,
+    "lessons": [
+      {
+        "scenario": "install",
+        "title": "Lab 1: New server install"
+      },
+      {
+        "scenario": "mgmt",
+        "title": "Lab 2: Management setup (F8 console, then web check)"
+      },
+      {
+        "scenario": "drive",
+        "title": "Lab 3: Replace a failed drive (hot-swap)"
+      },
+      {
+        "scenario": "mem8",
+        "title": "Lab 4: Memory: your choice of DIMMs, the Cisco way, read back in Cisco IMC"
+      },
+      {
+        "scenario": "nic",
+        "title": "Lab 5: Fit the 10 Gb VIC in riser 2, slot 5"
+      },
+      {
+        "scenario": "dimm",
+        "title": "Lab 6: Replace a failed DIMM"
+      },
+      {
+        "scenario": "fan",
+        "title": "Lab 7: Replace a failed fan (server running)"
+      },
+      {
+        "scenario": "psu",
+        "title": "Lab 8: Replace a failed power supply (hot-swap)"
+      },
+      {
+        "scenario": "ramdist",
+        "title": "Lab 9: RAM Distributor practice: plan the memory for a capacity"
+      },
+      {
+        "scenario": "ramexam",
+        "title": "Lab 10: RAM Distributor exam: a random work order, graded"
+      },
+      {
+        "scenario": "os-ubuntu",
+        "title": "Lab 11: OS install over Cisco IMC virtual media: Ubuntu Server 24.04"
+      },
+      {
+        "scenario": "os-rocky",
+        "title": "Lab 12: OS install over Cisco IMC virtual media: Rocky Linux 9.5"
+      },
+      {
+        "scenario": "os-esxi",
+        "title": "Lab 13: OS install over Cisco IMC virtual media: VMware ESXi 8.0 U3"
+      }
+    ]
+  }
+}

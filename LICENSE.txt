@@ -1,0 +1,9 @@
+Server build trainer
+Copyright (c) 2026 Mustafa Abdulkadhim, Information Technology. All rights reserved.
+
+This software, its source code, its images and its training content are the property of the copyright holder.
+No part of it may be copied, modified, distributed, published, sublicensed or sold, in whole or in part,
+without the prior written permission of the copyright holder.
+
+Cisco, Cisco UCS and the Cisco logo are trademarks of Cisco Systems, Inc. Other product names are the trademarks
+of their owners. They are used here only to identify the hardware the training is about.
