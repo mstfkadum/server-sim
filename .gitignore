@@ -4,7 +4,8 @@ _site/
 out/
 scorm/
 *.zip
-
+.README.md.swp
+CLAUDE.md
 # installed packages and system files
 node_modules/
 .DS_Store

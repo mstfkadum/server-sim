@@ -13,12 +13,12 @@ const HPE_RULES = {
   cpuName: c => `Processor ${c + 1}`,
   slotName: (c, pos) => `P${c + 1}-${pos + 1}`,
   slotList: ps => { const ns = ps.map(p => p + 1).sort((a, b) => a - b), w = ns.every(white), b = ns.every(n => !white(n)); return `slot${ns.length > 1 ? 's' : ''} ${ns.join(', ')}${w ? ' (white)' : b ? ' (black)' : ''}`; },
-  // the board: one group per channel (slots 1-2 ... 15-16, as on the service label), the processor between 8 and 9
-  board: { chans: Array.from({ length: 8 }, (_, k) => ({ label: () => `${2 * k + 1}-${2 * k + 2}`, pos: [2 * k, 2 * k + 1] })), split: 4,
-    slot: pos => ({ num: pos + 1, tone: white(pos + 1) ? 'white' : 'black' }),
-    note: 'Minimum: 1 DIMM per processor, in slot 10 (2 in all). Per processor 1, 2, 4, 6, 8, 12 or 16 DIMMs, in HPE\'s order: 10, 3, then 7, 14, then 5, 16, then 1, 12 (every white slot), then the black slots.',
+  // the board as it sits in the server, left to right (views-chassis.js: SLOTX): processor 2 with its slots 1-8 left
+  // of it and 9-16 right, then processor 1 the same; slot numbers as on the service label
+  board: { layout: [1, 0].flatMap((c, i) => [...[0, 1, 2, 3, 4, 5, 6, 7].map(pos => ({ c, pos })), { cpu: c }, ...[8, 9, 10, 11, 12, 13, 14, 15].map(pos => ({ c, pos })), ...(i ? [] : [{ gap: true }])]),
+    slot: pos => ({ tone: white(pos + 1) ? 'white' : 'black' }), label: (c, pos) => String(pos + 1),
+    note: 'Minimum: 1 DIMM per processor, in slot 10 (2 in all). Per processor 1, 2, 4, 6, 8, 12 or 16 DIMMs, in HPE\'s order: 10, 3, then 7, 14, then 5, 16, then 1, 12 (every white slot), then the black slots; processor 2 the same as processor 1.',
     legend: ['in an HPE layout, both processors alike', 'in order, count or other processor not finished', 'wrong slot or type'] },
-  quick: [32, 64, 128, 192, 256, 384, 512, 768, 1024, 2048],
   facts: cpus => [['Processors', `${cpus} x Xeon Gold 6430`], ['Slots', '16 per processor, 8 channels of 2'], ['Speed', '4800 MT/s; 4400 with 2 per channel'], ['DIMMs', 'HPE DDR5-4800 RDIMM: 16, 32 and 64 GB']],
   rules: ['Per processor: 1, 2, 4, 6, 8, 12 or 16 DIMMs, each count in its own slots (the table in the Memory view). Other counts may not boot.',
     'Both processors the same: HPE splits the DIMMs evenly over the processors.',

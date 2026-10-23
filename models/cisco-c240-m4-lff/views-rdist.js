@@ -14,12 +14,11 @@ const CIS_RULES = {
   cpuName: c => `CPU ${c + 1}`,
   slotName: rdName,
   slotList: (ps, cpus) => ps.slice().sort((a, b) => CIS_ORDER.indexOf(a) - CIS_ORDER.indexOf(b)).map(p => rdName(0, p)).join(', ') + (cpus > 1 ? ' (E to H the same on CPU 2)' : ''),
-  // the board: one group per channel (A to D, E to H on CPU 2), its sockets blue #1, black #2, white #3
-  board: { chans: [0, 1, 2, 3].map(ch => ({ label: c => PROFILE.channels[c][ch], pos: [ch * 3, ch * 3 + 1, ch * 3 + 2] })),
-    slot: pos => ({ num: pos % 3 + 1, tone: ['blue', 'black', 'white'][pos % 3] }),
-    note: 'Minimum: 1 DIMM per CPU, in A1 and E1 (2 in all). Order per CPU: blue #1 in A to D, then black #2, then white #3.',
+  // the board as it sits in the server, left to right (model.js: PROFILE.layout): G H, CPU 2, F E C D, CPU 1, B A
+  board: { layout: PROFILE.layout.map(k => k.startsWith('CPU') ? { cpu: +k.slice(3) - 1 } : (c => ({ c, pos: PROFILE.channels[c].indexOf(k[0]) * 3 + (+k[1] - 1) }))(PROFILE.channels[0].includes(k[0]) ? 0 : 1)),
+    slot: pos => ({ tone: ['blue', 'black', 'white'][pos % 3] }), label: rdName,
+    note: 'Minimum: 1 DIMM per CPU, in A1 and E1 (2 in all). Order: blue #1 sockets first, alternating CPUs (A1, E1, B1, F1 ... D1, H1), then black #2, then white #3.',
     legend: ['in Cisco\'s order, both CPUs alike', 'in order, other CPU not matching yet', 'wrong socket or mixed type'] },
-  quick: [32, 64, 96, 128, 256, 384, 512, 1024, 1536],
   facts: cpus => [['Processors', `${cpus} x Xeon E5-2680 v4`], ['Sockets', '12 per CPU, 4 channels of 3'], ['Speed', '2400 MHz; 3 per channel 2133, or 1866 with dual-rank RDIMMs'], ['DIMMs', 'Cisco DDR4-2400: 16 and 32 GB RDIMM, 64 GB LRDIMM']],
   rules: ['Per CPU: 1 to 12 DIMMs in Cisco\'s order: blue #1 in A to D, then black #2, then white #3.',
     'Both CPUs identical: the same DIMMs in the same positions (A1 and E1, B1 and F1 ...).',

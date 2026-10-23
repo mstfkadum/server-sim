@@ -1,6 +1,7 @@
-// RAM Distributor: every work order of every model, placed on the board by its cues in practice and in the exam (both
-// must reach the best layout: practice "best", exam score 100), then hand-made layouts graded against each vendor's
-// rules, then the board's own buttons (Distribute, Clear Board, Random Exam, Verify Distribution) in the planner.
+// RAM Distributor: the practice by its cues for every processor count and DIMM size (the vendor's layout, verified
+// correct), every exam work order of every model by its cues (the best layout, score 100), hand-made layouts graded
+// against each vendor's rules, then the board in the planner: the memory list, the buttons, the manual placement and
+// the one "next" marker.
 // Usage: node tests/ram-distributor.js [dist/index.html]
 const { chromium } = require('playwright'), path = require('path');
 const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '..', 'dist', 'index.html'));
@@ -22,12 +23,19 @@ const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '.
   });
   for (const m of await p.evaluate(() => Sim.modelOrder)) {
     await p.selectOption('#model', m);
-    const n = await p.evaluate(() => REG().mem.tasks.length);
-    for (let k = 0; k < n; k++) for (const sc of ['ramdist', 'ramexam']) {
-      await p.evaluate(([k, sc]) => { MemPlan.test.k = k; loadScenario(sc); }, [k, sc]);
+    // practice: every processor count and DIMM size, the setup and the placement by the cues, then a correct verify
+    for (const cpus of [1, 2]) for (const part of await p.evaluate(() => REG().mem.parts.map(x => x.key))) {
+      await p.evaluate(([cpus, part]) => { loadScenario('ramdist'); Sim.do('mpCpus', String(cpus)); Sim.do('mpPart', part); }, [cpus, part]);
       const r = await run();
-      const res = await p.evaluate(() => { const g = MemPlan.checked(twin()); return { gb: twin().rd.gb, cpus: twin().rd.cpus, best: g && g.best, fail: g && g.fail, why: g ? [...g.hard, ...g.soft.map(s => s.msg)].join(' ') : '', grade: twin().grade, errors: twin().errors, title: g ? MemPlan.title(REG().mem, g.maps) : '' }; });
-      ok(r === 'done' && res.best && !res.errors && (sc === 'ramdist' || (res.grade && !res.grade.fail && !res.grade.penalty)), `${m} ${sc} #${k} ${res.cpus}P ${res.gb} GB: ${r}, ${res.title}${res.why ? ' | ' + res.why : ''}`);
+      const res = await p.evaluate(() => { const g = MemPlan.checked(twin()), s = twin().mp; return { gb: s.gb, ok: g && g.ok, errors: twin().errors, title: g ? MemPlan.title(REG().mem, g.goal.slice(0, s.cpus)) : '' }; });
+      ok(r === 'done' && res.ok && !res.errors, `${m} ramdist ${cpus}P ${part}: ${res.gb} GB ${r}, ${res.title}`);
+    }
+    const n = await p.evaluate(() => REG().mem.tasks.length);
+    for (let k = 0; k < n; k++) {
+      await p.evaluate(k => { MemPlan.test.k = k; loadScenario('ramexam'); }, k);
+      const r = await run();
+      const res = await p.evaluate(() => { const g = MemPlan.checked(twin()); return { gb: twin().rd.gb, cpus: twin().rd.cpus, best: g && g.best, why: g ? [...g.hard, ...g.soft.map(s => s.msg)].join(' ') : '', grade: twin().grade, errors: twin().errors, title: g ? MemPlan.title(REG().mem, g.maps) : '' }; });
+      ok(r === 'done' && res.best && !res.errors && res.grade && !res.grade.fail && !res.grade.penalty, `${m} ramexam #${k} ${res.cpus}P ${res.gb} GB: ${r}, ${res.title}${res.why ? ' | ' + res.why : ''}`);
     }
   }
   await p.evaluate(() => { MemPlan.test.k = null; });
@@ -72,17 +80,27 @@ const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '.
     return out;
   });
   cases.forEach(c => ok(c.exp === 'best' ? c.best : c.exp === 'fail' ? c.fail : !c.fail && c.pen === c.exp, `${c.name}: ${c.fail ? 'fail' : c.best ? 'best' : '-' + c.pen}${c.msg ? ' | ' + c.msg : ''}`));
-  // the board in the planner (the RAM Distributor of a lab that is not a RAM lab): its buttons and the manual placement
+  // the board in the planner (the RAM Distributor of a lab that is not a RAM lab): the setup, its buttons, the manual
+  // placement and the one "next" marker
   for (const m of await p.evaluate(() => Sim.modelOrder)) {
     const r = await p.evaluate(m => {
-      loadModel(m, 'install'); Sim.do('go', 'rdist'); const R = REG().mem, t = twin(), out = {}, n = b => b.flat().filter(Boolean).length;
-      out.sockets = document.querySelectorAll('#stage .mpk').length === R.cpus * R.slots;
-      Sim.do('mpQuick', String(R.quick[3])); out.quick = t.mp.gb === R.quick[3];
-      const inp = document.querySelector('#stage [data-field="mp.gb"]'); inp.value = '384'; inp.dispatchEvent(new Event('input', { bubbles: true }));
-      Sim.do('mpDist'); const want = MemPlan.target(t); out.dist = JSON.stringify(t.mp.board) === JSON.stringify(want) && t.mp.gb === 384;
-      Sim.do('mpVerify'); const g = MemPlan.checked(t); out.verify = !!g && g.best;
+      loadModel(m, 'install'); Sim.guide = true; Sim.do('go', 'rdist'); const R = REG().mem, t = twin(), out = {}, n = b => b.flat().filter(Boolean).length;
+      const pick = gb => { const el = document.querySelector('#stage [data-field="mp.sel"]'); el.value = String(gb); el.dispatchEvent(new Event('input', { bubbles: true })); Sim.do('go', 'rdist'); };
+      out.slots = document.querySelectorAll('#stage svg [data-act="mpSlot"]').length === R.cpus * R.slots;
+      // the memory list: every size offered builds a supported layout with the chosen DIMM, and nothing else is offered
+      out.choices = R.parts.every(p => [1, 2].every(c => { Sim.do('mpCpus', String(c)); Sim.do('mpPart', p.key);
+        const os = [...document.querySelectorAll('#stage [data-field="mp.sel"] option')].map(o => +o.value).filter(Boolean), ch = MemPlan.choices(R, c, p.key);
+        return os.join() === ch.map(x => x.gb).join() && ch.every(x => !MemPlan.errors(R, [0, 1].map(k => k < c ? R.fill.reduce((mm, pos, i) => { if (i < x.n) mm[pos] = p.key; return mm; }, Array(R.slots).fill(null)) : Array(R.slots).fill(null)), c).length); }));
+      Sim.do('mpCpus', '2'); Sim.do('mpPart', R.parts[1].key); const o = MemPlan.choices(R, 2, R.parts[1].key).find(x => x.n === R.channels); pick(o.gb);
+      out.select = t.mp.gb === o.gb;
+      Sim.do('mpDist'); out.dist = JSON.stringify(t.mp.board) === JSON.stringify(MemPlan.target(t));
+      Sim.do('mpVerify'); const g = MemPlan.checked(t); out.verify = !!g && g.ok;
       Sim.do('mpClear'); out.clear = n(t.mp.board) === 0 && !MemPlan.checked(t);
-      Sim.do('mpCpus', '1'); Sim.do('mpDist'); out.one = n(t.mp.board.slice(1)) === 0 && n(t.mp.board) > 0; Sim.do('mpCpus', '2'); Sim.do('mpClear');
+      // one "next" marker only, also when one processor is ahead of the other
+      R.fill.slice(0, 2).forEach(pos => Sim.do('mpSlot', `0:${pos}`));
+      out.oneNext = (document.querySelector('#stage .mpsvg').innerHTML.match(/stroke-dasharray="7 4"/g) || []).length === 1;
+      Sim.do('mpClear'); Sim.do('mpCpus', '1'); out.oneCpu = !!t.mp.gb === MemPlan.choices(R, 1, t.mp.part).some(x => x.gb === o.gb);
+      Sim.do('mpCpus', '2'); pick(o.gb); Sim.do('mpDist'); Sim.do('mpCpus', '1'); out.oneClears = n(t.mp.board.slice(1)) === 0; Sim.do('mpCpus', '2'); Sim.do('mpClear');
       // a random exam: Distribute is off until verified; the best layout placed by hand scores 100
       Sim.do('mpExam'); const w = t.mp.wo; Sim.do('mpDist'); out.examNoDist = !!w && n(t.mp.board) === 0;
       const goal = MemPlan.target(t); goal.forEach((mm, c) => R.fill.forEach(pos => { if (mm[pos]) { Sim.do('mpPart', mm[pos]); Sim.do('mpSlot', `${c}:${pos}`); } }));

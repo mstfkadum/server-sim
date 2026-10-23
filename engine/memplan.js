@@ -97,11 +97,11 @@ const MemPlan = (() => {
   const snapOf = maps => maps.map(m => m.map(k => k || '-').join(','));
   const unsnap = s => s.map(x => x.split(',').map(k => k === '-' ? null : k));
 
-  /* ---- state: the board (one array per processor socket of the server), the DIMM size placed next, the target and the
-     processors; the work order of a lab (t.rd) or of a random exam drawn on the board (t.mp.wo) ---- */
+  /* ---- state: the board (one array per processor socket of the server), the DIMM size placed next, the processors and
+     the memory chosen (practice); the work order of the exam lab (t.rd) or of a random exam drawn on the board (t.mp.wo) ---- */
   function st(t) {
     const r = R();
-    if (!t.mp) t.mp = { gb: r.defaultGb, gbIn: '', cpus: r.cpus, part: r.parts[0].key, board: full(r, []), wo: null, snap: null };
+    if (!t.mp) t.mp = { gb: null, cpus: r.cpus, part: (r.parts[1] || r.parts[0]).key, board: full(r, []), wo: null, snap: null };
     return t.mp;
   }
   const woOf = t => t.rd || st(t).wo;
@@ -110,12 +110,47 @@ const MemPlan = (() => {
   // an exam still open: no Distribute, no marks, no hints
   const closed = t => exam(t) && !woOf(t).submitted;
   const taskOf = t => { const w = woOf(t), s = st(t); return w ? { gb: w.gb, cpus: w.cpus } : { gb: s.gb, cpus: s.cpus }; };
-  // the best layout for the target, as maps for every socket: what Distribute places and the cues follow
+  /* ---- practice: one DIMM size, a count per processor in the vendor's slots. The memory selector offers only the totals
+     that size can build in a supported layout ---- */
+  const single = (r, part, n) => { const m = blank(r); r.fill.slice(0, n).forEach(pos => { m[pos] = part; }); return m; };
+  function choices(r, cpus, part) {
+    const out = [];
+    for (let n = 1; n <= r.slots; n++) {
+      const maps = Array.from({ length: cpus }, () => single(r, part, n));
+      if (!errors(r, full(r, maps), cpus).length) { const m = metrics(r, maps); out.push({ n, gb: m.gb, m }); }
+    }
+    return out;
+  }
+  // the practice layout as maps for every socket, or null while no memory size is chosen
+  function goalOfS(r, s) {
+    if (!s.gb) return null; const o = choices(r, s.cpus, s.part).find(x => x.gb === s.gb);
+    return o ? full(r, Array.from({ length: s.cpus }, () => single(r, s.part, o.n))) : null;
+  }
+  const goalOf = t => woOf(t) ? null : goalOfS(R(), st(t));
+  // what Distribute places and the cues follow: the practice layout, or the best layout for a work order
   function target(t) {
+    if (!woOf(t)) return goalOf(t);
     const r = R(), k = taskOf(t), p = plan(r, k.cpus, k.gb);
     return p.best[0] ? full(r, p.best[0].maps) : null;
   }
-  const checked = t => { const h = hold(t); return h.snap ? gradeMaps(R(), unsnap(h.snap), taskOf(t)) : null; };
+  // practice check: the board against the vendor's layout for the chosen DIMM, count and processors
+  function practiceGrade(r, s, maps) {
+    const g = goalOfS(r, s), m = metrics(r, maps.slice(0, s.cpus)), items = [];
+    const hard = errors(r, full(r, maps.slice()), s.cpus), names = l => l.length > 8 ? l.slice(0, 8).join(', ') + ' ...' : l.join(', ');
+    if (!m.dimms) items.push(['bad', 'No DIMMs on the board.']);
+    hard.forEach(x => items.push(['bad', x]));
+    if (g) {
+      const miss = [], extra = [], other = [];
+      for (let c = 0; c < r.cpus; c++) r.fill.forEach(pos => { const want = g[c][pos], have = maps[c][pos]; if (want && !have) miss.push(r.slotName(c, pos)); else if (!want && have) extra.push(r.slotName(c, pos)); else if (want && have !== want) other.push(r.slotName(c, pos)); });
+      if (other.length) items.push(['bad', `${names(other)}: not the ${r.part(s.part).short} chosen for this setup.`]);
+      if (extra.length) items.push(['bad', `${names(extra)}: not in the vendor's layout for ${s.gb} GB. Take ${extra.length > 1 ? 'them' : 'it'} out.`]);
+      if (miss.length) items.push(['mid', `Still empty: ${names(miss)}.`]);
+      if (m.gb !== s.gb) items.push(['mid', `${m.gb} GB on the board; the setup is ${s.gb} GB.`]);
+    }
+    const ok = !!g && !items.length;
+    return { practice: true, ok, fail: !ok, best: ok, items, m, p: s.gb ? plan(r, s.cpus, s.gb) : null, goal: g || full(r, []) };
+  }
+  const checked = t => { const h = hold(t), r = R(); if (!h.snap) return null; const maps = unsnap(h.snap); return woOf(t) ? gradeMaps(r, maps, taskOf(t)) : practiceGrade(r, st(t), maps); };
   // the result for the done banner outside a learning platform
   function examText(t) {
     const g = t.grade; if (!g) return '';
@@ -124,6 +159,9 @@ const MemPlan = (() => {
   }
 
   /* ---- the board ---- */
+  // the vendor's order over the server: the first slot of the order on each processor, then the second, and so on
+  // (A1, E1, B1, F1 ... on the Cisco; slot 10 of processor 1, slot 10 of processor 2, slot 3 ... on the HPE)
+  const order = (r, cpus) => r.fill.flatMap(pos => Array.from({ length: cpus }, (_, c) => [c, pos]));
   // a placed DIMM's mark: 'ok' (in the vendor's layout, both processors alike), 'part' (in order, but the other processor
   // or the count is not finished), 'bad' (a wrong slot, or a type that does not go with the others)
   function mark(r, maps, cpus, c, pos) {
@@ -136,49 +174,85 @@ const MemPlan = (() => {
     if (cpus > 1 && maps[1 - c][pos] !== k) return 'part';
     return r.countOk && !r.countOk(m) ? 'part' : 'ok';
   }
-  // what the side panel says: the target and where to start, or the state of the layout on the board
+  // the next slot to fill: of the practice layout when one is chosen, else of the vendor's order (one slot only)
+  function nextSlot(r, t) {
+    const s = st(t), k = taskOf(t), g = target(t), b = s.board;
+    const o = order(r, k.cpus).find(([c, pos]) => g ? g[c][pos] && b[c][pos] !== g[c][pos] : !b[c][pos]);
+    return o ? o.join(':') : '';
+  }
+  // what the line above the map says: what to do next, or the state of the layout on the board
   function status(r, t) {
     const s = st(t), k = taskOf(t), inst = s.board.slice(0, k.cpus), m = metrics(r, inst), U = r.unit || 'MT/s';
     if (closed(t)) return ['info', m.dimms ? `${pl(m.dimms, 'DIMM')} on the board, ${m.gb} GB. Verify the distribution when the layout is ready.` : `Work order: at least ${k.gb} GB with ${pl(k.cpus, cpuW(r))}. Choose a DIMM size, then click the slots.`];
+    if (!woOf(t) && !s.gb) return ['info', `Choose the ${cpuW(r)}s, the DIMM and the memory size above: the list offers only what ${r.part(s.part).short}s can build in a supported layout.`];
     if (!m.dimms) {
-      const p = plan(r, k.cpus, k.gb), b = p.best[0];
-      if (!b) return ['warn', `No supported layout reaches ${k.gb} GB with ${pl(k.cpus, cpuW(r))}: the most this server holds is ${p.max} GB.`];
-      const first = Array.from({ length: k.cpus }, (_, c) => r.slotName(c, r.fill[0]));
-      return ['info', `Target: ${k.gb} GB${p.exact ? '' : `, the least a supported layout gives is ${p.need} GB`} (${title(r, [b.map])} per ${cpuW(r)}). Start with ${first.join(' and ')}.`];
+      const g = target(t), first = g ? order(r, k.cpus).filter(([c, pos]) => g[c][pos]).slice(0, k.cpus).map(([c, pos]) => r.slotName(c, pos)) : [];
+      if (!g) return ['warn', `No supported layout reaches ${k.gb} GB with ${pl(k.cpus, cpuW(r))}.`];
+      const start = Sim.guide ? ` Start with ${first.join(' and ')}.` : '';
+      return ['info', woOf(t) ? `Work order: at least ${k.gb} GB.${start}` : `${k.gb} GB: ${title(r, g.slice(0, 1))} per ${cpuW(r)}${k.cpus > 1 ? `, ${pl(k.cpus, cpuW(r))} the same` : ''}.${start}`];
+    }
+    // practice, on the way to the chosen layout: progress, not the rules a half-filled board still breaks
+    const g = goalOf(t);
+    if (g && order(r, k.cpus).every(([c, pos]) => !s.board[c][pos] || s.board[c][pos] === g[c][pos])) {
+      const need = order(r, k.cpus).filter(([c, pos]) => g[c][pos]), nx = need.find(([c, pos]) => !s.board[c][pos]);
+      if (nx) return ['info', `${m.dimms} of ${need.length} DIMMs placed for ${k.gb} GB, in the vendor's order.${Sim.guide ? ` Next: ${r.slotName(nx[0], nx[1])}.` : ''}`];
     }
     const e = errors(r, full(r, s.board.slice()), k.cpus);
     if (e.length) return ['warn', e[0]];
-    return ['ok', `Supported: ${title(r, inst)}, ${m.gb} GB at ${m.speed} ${U}, ${bwTxt(m.bw)} per ${cpuW(r)}.${m.gb < k.gb ? ` ${k.gb - m.gb} GB short of the target.` : ''}`];
+    return ['ok', `Supported: ${title(r, inst)}, ${m.gb} GB at ${m.speed} ${U}, ${bwTxt(m.bw)} per ${cpuW(r)}.${k.gb && m.gb < k.gb ? ` ${k.gb - m.gb} GB short of ${k.gb} GB.` : ''}`];
+  }
+  // the map: the slots and the processors in their real places on the board, seen from above, the rear of the server at
+  // the top. Click a slot to place the chosen DIMM, click it again to take it out
+  const TONE = { blue: ['#2667B8', '#0D2C57', '#FFFFFF'], black: ['#1C2025', '#000000', '#E8EEF2'], white: ['#E4DCC3', '#A99F84', '#14181C'] };
+  const PART = ['#4E5FA6', '#2C7C78', '#8A5A2B'], MK = { ok: '#7CF0A8', part: '#FFC85A', bad: '#FF8A7A' };
+  function mapSvg(r, t) {
+    const s = st(t), k = taskOf(t), b = s.board, q = closed(t), lock = !!(t.rd && t.rd.submitted), lay = r.board.layout;
+    const nx = Sim.guide && !q && !t.rd && !t.mpLab ? nextSlot(r, t) : '';
+    const units = lay.reduce((a, x) => a + (x.cpu !== undefined ? 6 : x.gap ? 0.6 : 1), 0), P = 852 / units, sw = Math.min(17, P * 0.66);
+    const Y0 = 58, H = 176, W = 900, keyIdx = key => r.parts.findIndex(p => p.key === key);
+    let x = 24, g = `<rect x="0" y="0" width="${W}" height="300" fill="#16293A"/><rect x="14" y="34" width="872" height="238" rx="8" fill="#1F3A28" stroke="#2E5571"/>`;
+    g += `<text x="450" y="24" text-anchor="middle" class="ss" style="fill:#C5CCD3">↑ Rear of the server</text>`;
+    lay.forEach(it => {
+      if (it.gap) { x += P * 0.6; return; }
+      if (it.cpu !== undefined) {
+        const c = it.cpu, off = c >= k.cpus, cx = x + P * 3, w = P * 5;
+        g += `<g opacity="${off ? 0.45 : 1}"><rect x="${(cx - w / 2).toFixed(1)}" y="${Y0 + 26}" width="${w.toFixed(1)}" height="${H - 52}" rx="6" fill="#9AA4AC" stroke="#4E5961" stroke-width="2"/>`;
+        for (let i = 0; i < 9; i++) g += `<rect x="${(cx - w / 2 + 6).toFixed(1)}" y="${Y0 + 34 + i * 12}" width="${(w - 12).toFixed(1)}" height="6" rx="1" fill="#C3CBD1"/>`;
+        g += `<rect x="${(cx - 44).toFixed(1)}" y="${Y0 + H / 2 - 14}" width="88" height="28" rx="4" fill="#FFFFFF" stroke="#2A2F35"/><text x="${cx.toFixed(1)}" y="${Y0 + H / 2 + 5}" text-anchor="middle" style="font:800 13px var(--font);fill:#14181C">${esc(r.cpuName(c))}</text>`;
+        if (off) g += `<text x="${cx.toFixed(1)}" y="${Y0 + H - 34}" text-anchor="middle" style="font:700 11px var(--font);fill:#14181C">not installed</text>`;
+        g += '</g>'; x += P * 6; return;
+      }
+      const { c, pos } = it, key = b[c][pos], sl = r.board.slot(pos), [base, groove, ink] = TONE[sl.tone], cx = x + P / 2, off = c >= k.cpus;
+      const mk = key && !q ? mark(r, b, k.cpus, c, pos) : '', name = r.slotName(c, pos);
+      const lbl = `${name} (${sl.tone})${key ? `: ${r.part(key).short}${mk ? `, ${{ ok: 'in the layout', part: 'in order, not finished', bad: 'wrong slot or type' }[mk]}` : ''}, click to take it out` : ': empty, click to place the chosen DIMM'}`;
+      let sg = `<rect x="${(cx - sw / 2).toFixed(1)}" y="${Y0}" width="${sw.toFixed(1)}" height="${H}" rx="2" fill="${base}" stroke="${groove}"/><rect x="${(cx - 1.2).toFixed(1)}" y="${Y0 + 8}" width="2.4" height="${H - 16}" fill="${groove}" opacity=".7"/>`;
+      if (key) {
+        const kc = PART[keyIdx(key)] || '#4E5FA6';
+        sg += `<rect x="${(cx - sw / 2 - 1).toFixed(1)}" y="${Y0 - 6}" width="${(sw + 2).toFixed(1)}" height="${H + 12}" rx="2" fill="#2D6A44" stroke="${mk ? MK[mk] : '#163A24'}" stroke-width="${mk ? 2.5 : 1}"/><rect x="${(cx - sw / 2 + 1).toFixed(1)}" y="${Y0 + 4}" width="${(sw - 2).toFixed(1)}" height="${H - 8}" rx="1" fill="${kc}"/>`;
+        sg += `<text transform="translate(${(cx + 4).toFixed(1)} ${Y0 + H / 2}) rotate(-90)" text-anchor="middle" style="font:800 ${sw > 14 ? 12 : 10.5}px var(--font);fill:#FFFFFF" pointer-events="none">${r.part(key).cap} GB</text>`;
+      }
+      if (nx === `${c}:${pos}`) sg += `<rect x="${(cx - sw / 2 - 4).toFixed(1)}" y="${Y0 - 10}" width="${(sw + 8).toFixed(1)}" height="${H + 20}" rx="4" fill="none" stroke="#F2AD45" stroke-width="3" stroke-dasharray="7 4" pointer-events="none"/>`;
+      sg += `<rect x="${(cx - P / 2).toFixed(1)}" y="${Y0 - 8}" width="${P.toFixed(1)}" height="${H + 16}" class="zone"/>`;
+      g += off || lock ? `<g opacity="${off ? 0.4 : 1}">${sg}</g>` : `<g${hot('mpSlot', `${c}:${pos}`, lbl)}>${sg}</g>`;
+      g += `<text x="${cx.toFixed(1)}" y="${Y0 + H + 22}" text-anchor="middle" style="font:700 ${P > 21 ? 11 : 9.5}px var(--font);fill:${sl.tone === 'white' ? '#F4F0DE' : sl.tone === 'blue' ? '#9FC3E8' : '#AEB8C1'}" pointer-events="none">${esc(r.board.label(c, pos))}</text>`;
+      x += P;
+    });
+    g += `<rect x="300" y="276" width="300" height="18" rx="3" fill="#C5CCD3"/><text x="450" y="289" text-anchor="middle" style="font:700 11.5px var(--font);fill:#14181C">Front of the server</text>`;
+    return `<div class="mpsvgw"><svg class="mpsvg" viewBox="0 0 ${W} 300" role="group" aria-label="Memory slots and ${cpuW(r)}s, top view">${g}</svg></div>`;
   }
   function boardHtml(r, t) {
-    const s = st(t), k = taskOf(t), b = s.board, q = closed(t), lock = !!(t.rd && t.rd.submitted), inst = b.slice(0, k.cpus), m = metrics(r, inst);
-    const keyIdx = key => r.parts.findIndex(p => p.key === key);
-    // with guidance on and outside an exam, the next slot of the fill order on each processor
-    const next = Sim.guide && !q ? Array.from({ length: k.cpus }, (_, c) => r.fill.find(pos => !b[c][pos])) : [];
-    const slot = (c, pos) => {
-      const key = b[c][pos], off = c >= k.cpus, sl = r.board.slot(pos), mk = key && !q ? mark(r, b, k.cpus, c, pos) : '';
-      const lbl = `${r.slotName(c, pos)} (${sl.tone})${key ? `: ${r.part(key).short}${mk ? `, ${{ ok: 'in the layout', part: 'in order, not finished', bad: 'wrong slot or type' }[mk]}` : ''}` : ': empty'}`;
-      return `<button class="mpk t-${sl.tone}${key ? ` f k${keyIdx(key)}` : ''}${mk ? ` m-${mk}` : ''}${!key && next[c] === pos ? ' nx' : ''}" data-act="mpSlot" data-arg="${c}:${pos}" aria-label="${esc(lbl)}"${off || lock ? ' disabled' : ''}>${key ? r.part(key).cap : sl.num}</button>`;
-    };
-    const rows = Array.from({ length: r.cpus }, (_, c) => {
-      const n = b[c].filter(Boolean).length, off = c >= k.cpus;
-      return `<div class="mprow${off ? ' off' : ''}"><div class="mpcpu"><b>${esc(r.cpuName(c))}</b><small>${off ? 'not installed' : `${n} of ${r.slots}`}</small></div><div class="mpchs">${r.board.chans.map((ch, i) => `${r.board.split && i === r.board.split ? '<i class="mpsplit" aria-hidden="true"></i>' : ''}<div class="mpch"><span>${esc(ch.label(c))}</span><div>${ch.pos.map(pos => slot(c, pos)).join('')}</div></div>`).join('')}</div></div>`;
-    }).join('');
-    const [tone, msg] = status(r, t);
-    const parts = r.parts.map((p, i) => `<button class="mppart k${i}${s.part === p.key ? ' on' : ''}" data-act="mpPart" data-arg="${p.key}" aria-pressed="${s.part === p.key}"${lock ? ' disabled' : ''}><b>${p.cap} GB</b><span>${esc(p.short)}</span><small>${esc(p.pid)}</small></button>`).join('');
-    const legend = q ? '' : `<div class="mpleg">${[['ok', r.board.legend[0]], ['part', r.board.legend[1]], ['bad', r.board.legend[2]]].map(([c, l]) => `<span><i class="m-${c}"></i>${esc(l)}</span>`).join('')}</div>`;
+    const s = st(t), k = taskOf(t), q = closed(t), inst = s.board.slice(0, k.cpus), m = metrics(r, inst), [tone, msg] = status(r, t);
+    const legend = q ? '' : `<div class="mpleg">${[['ok', r.board.legend[0]], ['part', r.board.legend[1]], ['bad', r.board.legend[2]]].map(([c, l]) => `<span><i class="m-${c}"></i>${esc(l)}</span>`).join('')}${r.parts.map((p, i) => `<span><i class="k${i}"></i>${esc(p.short)}</span>`).join('')}</div>`;
     return `<section class="mpmap"><h3>Population map: ${pl(m.dimms, 'DIMM')}, <b>${m.gb} GB</b>${m.dimms && !q ? ` at ${m.speed} ${r.unit || 'MT/s'}` : ''}</h3><p class="mpnote">${esc(r.board.note)}</p>
-      <div class="mpside"><div><p class="mpsl">DIMM to place</p><div class="mpparts" role="group" aria-label="DIMM size to place">${parts}</div></div><p class="mpmsg ${tone}">${esc(msg)}</p></div>${rows}
-      <div class="mpfoot">${legend}<p>Numbers in a fitted slot: its size in GB. Click a slot to place the chosen DIMM there; click it again to take it out.${q ? '' : ' Amber outline: the next slot in the vendor\'s order (guidance on).'}</p></div></section>`;
+      <p class="mpmsg ${tone}">${esc(msg)}</p>${mapSvg(r, t)}
+      <div class="mpfoot">${legend}<p>Top view, as the slots and ${cpuW(r)}s sit on the board. Click a slot to place the chosen DIMM there; click it again to take it out.${!q && !t.rd && !t.mpLab ? ' Dashed amber outline: the next slot (guidance on).' : ''}</p></div></section>`;
   }
   const factsHtml = (r, cpus) => `<dl class="mpf">${r.facts(cpus).map(([a, b]) => `<div><dt>${esc(a)}</dt><dd>${esc(b)}</dd></div>`).join('')}</dl>`;
-  const btn = (label, act, arg, cls, dis) => `<button class="btn${cls ? ' ' + cls : ''}" data-act="${act}" data-arg="${arg}"${dis ? ' disabled' : ''}>${esc(label)}</button>`;
-  // the capacities to try with one click; a star where no layout fills every channel equally at exactly that capacity
-  function quickHtml(r, s) {
-    return `<div class="mpq" role="group" aria-label="Quick capacities"><span>Quick capacities:</span>${(r.quick || []).map(gb => {
-      const p = plan(r, s.cpus, gb), b = p.best[0], odd = !b || !p.exact || !(b.m.full && b.m.even);
-      return `<button class="mpchip${odd ? ' odd' : ''}${s.gb === gb ? ' on' : ''}" data-act="mpQuick" data-arg="${gb}" aria-pressed="${s.gb === gb}" title="${odd ? (b ? (p.exact ? 'No layout fills every channel equally at this capacity' : `Not exact: the least a supported layout gives is ${p.need} GB`) : 'More than this server holds') : 'Every channel filled equally'}">${gb >= 1024 ? `${gb} GB (${gb / 1024} TB)` : `${gb} GB`}${odd ? ' *' : ''}</button>`;
-    }).join('')}</div>`;
+  const btn = (label, act, arg, cls, dis, extra) => `<button class="btn${cls ? ' ' + cls : ''}" data-act="${act}" data-arg="${arg}"${dis ? ' disabled' : ''}${extra || ''}>${esc(label)}</button>`;
+  // the memory selector of the practice: only the totals the chosen DIMM builds in a supported layout
+  function memSelect(r, s) {
+    const os = choices(r, s.cpus, s.part);
+    return `<label class="mpsel"><span>Memory</span><select data-field="mp.sel" aria-label="Memory size"><option value=""${s.gb ? '' : ' selected'}>Choose…</option>${os.map(o => `<option value="${o.gb}"${s.gb === o.gb ? ' selected' : ''}>${o.gb >= 1024 ? `${o.gb / 1024} TB` : `${o.gb} GB`}: ${o.n} × ${r.part(s.part).cap} GB per ${cpuW(r)}${o.m.full && o.m.even ? ', every channel' : ''}</option>`).join('')}</select></label>`;
   }
 
   /* ---- the view ---- */
@@ -186,24 +260,38 @@ const MemPlan = (() => {
     const r = R(), s = st(t), w = woOf(t), d = t.rd, q = closed(t), k = taskOf(t);
     const verify = d && d.exam && !d.submitted && d.confirm ? `<span class="mpconf">Submit now? The layout is locked after this.</span>${btn('Yes, submit', 'mpVerify', 'yes', 'pri')}${btn('Not yet', 'mpVerify', 'no')}`
       : btn('Verify Distribution', 'mpVerify', '', 'mpgo', !!(d && d.exam && d.submitted));
+    const lockAll = !!(d && d.submitted);
     let h = `<div class="mp cueable"><header class="mph"><div><h2>RAM Distributor</h2><p>${esc(r.server)}</p></div>${factsHtml(r, k.cpus)}</header>`;
-    h += `<section class="mpbar" aria-label="Target and actions"><label class="mptg"><span>Target GB</span><input type="number" min="1" inputmode="numeric" data-field="mp.gb" data-enter="mpDist" value="${esc(w ? w.gb : s.gbIn || s.gb)}" aria-label="Target capacity in GB"${w ? ' disabled' : ''}>${btn('Distribute', 'mpDist', '', 'mpdist', q)}</label>
-      <div class="mpseg" role="group" aria-label="${esc(cpuW(r))}s installed">${[1, 2].map(n => `<button class="btn${k.cpus === n ? ' on' : ''}" data-act="mpCpus" data-arg="${n}" aria-pressed="${k.cpus === n}"${w ? ' disabled' : ''}>${n} ${esc(n === 1 ? cpuW(r) : cpuW(r) + 's')}</button>`).join('')}</div>
-      ${btn('Clear Board', 'mpClear', '', '', !!(d && d.submitted))}${d ? '' : btn(s.wo ? 'New Random Exam' : 'Random Exam', 'mpExam', '', 'mpexam')}${!d && s.wo ? btn('Leave the exam', 'mpExamEnd') : ''}${verify}</section>`;
-    if (!w) h += quickHtml(r, s);
-    else h += `<section class="mpwo"><div class="wo-n"><span>Work order</span><b>${esc(w.ref)}</b></div><div class="wo-b"><p class="wo-gb">At least <b>${w.gb} GB</b> of memory, ${pl(w.cpus, cpuW(r))} installed</p><p>${q ? 'Exam: place the DIMMs on the board, then verify the distribution. Distribute and the marks stay off until you verify.' : w.exam ? 'Verified: the result is below. Distribute now shows the best layout.' : 'Practice: place the DIMMs on the board, then verify the distribution. Distribute shows the best layout.'}</p><p class="wo-r">Best = the least capacity that meets the order, then the fastest layout (memory bandwidth within 5 %), then the fewest DIMMs.</p></div></section>`;
+    h += `<section class="mpbar" aria-label="Setup and actions">
+      <div class="mpgrp"><span>${esc(cpuW(r).replace(/^./, c => c.toUpperCase()))}s</span><div class="mpseg" role="group" aria-label="${esc(cpuW(r))}s installed">${[1, 2].map(n => btn(String(n), 'mpCpus', n, k.cpus === n ? 'on' : '', !!w, ` aria-pressed="${k.cpus === n}"`)).join('')}</div></div>
+      <div class="mpgrp"><span>DIMM</span><div class="mpseg" role="group" aria-label="DIMM size">${r.parts.map((p, i) => btn(`${p.cap} GB`, 'mpPart', p.key, `k${i}${s.part === p.key ? ' on' : ''}`, lockAll, ` aria-pressed="${s.part === p.key}" title="${esc(`${p.short}, ${p.pid}`)}"`)).join('')}</div></div>
+      ${w ? '' : memSelect(r, s)}
+      ${btn('Distribute', 'mpDist', '', 'mpdist', q || (!w && !s.gb))}${btn('Clear Board', 'mpClear', '', '', lockAll)}${d ? '' : btn(s.wo ? 'New Random Exam' : 'Random Exam', 'mpExam', '', 'mpexam')}${!d && s.wo ? btn('Leave the exam', 'mpExamEnd') : ''}${verify}</section>`;
+    const pd = r.part(s.part);
+    h += `<p class="mppick">DIMM to place: <b>${esc(pd.name || pd.short)}</b> <span>${esc(pd.pid)}, ${esc(pd.org)}</span></p>`;
+    if (w) h += `<section class="mpwo"><div class="wo-n"><span>Work order</span><b>${esc(w.ref)}</b></div><div class="wo-b"><p class="wo-gb">At least <b>${w.gb} GB</b> of memory, ${pl(w.cpus, cpuW(r))} installed</p><p>${q ? 'Exam: place the DIMMs on the board (any of the three sizes), then verify the distribution. Distribute and the marks stay off until you verify.' : 'Verified: the result is below. Distribute now shows the best layout.'}</p><p class="wo-r">Best = the least capacity that meets the order, then the fastest layout (memory bandwidth within 5 %), then the fewest DIMMs.</p></div></section>`;
     h += boardHtml(r, t);
-    const g = checked(t); if (g) h += reportHtml(r, t, g);
+    const g = checked(t); if (g) h += g.practice ? practiceHtml(r, t, g) : reportHtml(r, t, g);
     if (!q && r.excludedNote) h += `<p class="mpx">${esc(r.excludedNote)}</p>`;
     return h + '</div>';
   }
+  const statsHtml = (r, m) => `<dl class="mps"><div><dt>Capacity</dt><dd>${m.gb} GB</dd></div><div><dt>Speed</dt><dd>${m.speed} ${r.unit || 'MT/s'}</dd></div><div><dt>Channels</dt><dd>${m.used} of ${r.channels} <small>${m.even ? 'balanced' : 'unbalanced'}</small></dd></div><div><dt>Bandwidth</dt><dd>${bwTxt(m.bw)} <small>per ${cpuW(r)}</small></dd></div><div><dt>DIMMs</dt><dd>${m.dimms}</dd></div></dl>`;
+  function practiceHtml(r, t, g) {
+    const s = st(t), m = g.m, U = r.unit || 'MT/s', n = g.goal[0].filter(Boolean).length;
+    let h = `<section class="mprep ${g.ok ? 'ok' : 'bad'}"><h3>Verify distribution</h3><p class="v"><b>${g.ok ? 'Correct' : 'Not yet'}</b> ${g.ok ? `The vendor's layout for ${n} × ${r.part(s.part).short} per ${cpuW(r)}, ${s.gb} GB in all: ${esc(where(r, g.goal[0], s.cpus))}.` : 'The board does not match the vendor\'s layout for this setup yet.'}</p>`;
+    if (m.dimms) h += statsHtml(r, m);
+    if (g.items.length) h += `<ul class="mpfind">${g.items.map(([c, x]) => `<li class="${c}">${esc(x)}</li>`).join('')}</ul>`;
+    const b = g.p && g.p.best[0];
+    if (g.ok && b) h += `<p class="mpy">${title(r, b.maps) === title(r, g.goal.slice(0, s.cpus)) ? `<b>The best layout for ${s.gb} GB</b> with these DIMMs or any other size: no layout is faster or uses fewer DIMMs.` : `<b>For ${g.p.need} GB with any DIMM size</b>, the best layout is ${esc(title(r, b.maps))} (${esc(where(r, b.map, s.cpus))}): ${b.m.speed} ${U}, ${bwTxt(b.m.bw)} per ${cpuW(r)}, against ${bwTxt(m.bw)} here.`}</p>`;
+    return h + '</section>';
+  }
   function reportHtml(r, t, g) {
     const w = woOf(t), ex = !!(w && w.exam), m = g.m, p = g.p, U = r.unit || 'MT/s';
-    const verdict = g.fail ? ['bad', 'Not supported', g.hard[0]] : g.best ? ['ok', 'Supported: the best layout for this target', ex ? 'Full marks for the plan.' : 'Least capacity needed, best bandwidth, fewest DIMMs.'] : ['mid', 'Supported, but not the best layout', ex ? `${g.penalty} points off the plan.` : 'A better layout exists: see below.'];
+    const verdict = g.fail ? ['bad', 'Not supported', g.hard[0]] : g.best ? ['ok', 'Supported: the best layout for this order', ex ? 'Full marks for the plan.' : 'Least capacity needed, best bandwidth, fewest DIMMs.'] : ['mid', 'Supported, but not the best layout', ex ? `${g.penalty} points off the plan.` : 'A better layout exists: see below.'];
     let h = `<section class="mprep ${verdict[0]}"><h3>Verify distribution</h3><p class="v"><b>${esc(verdict[1])}</b> ${esc(verdict[2])}</p>`;
-    if (m.dimms) h += `<dl class="mps"><div><dt>Capacity</dt><dd>${m.gb} GB</dd></div><div><dt>Speed</dt><dd>${m.speed} ${U}</dd></div><div><dt>Channels</dt><dd>${m.used} of ${r.channels} <small>${m.even ? 'balanced' : 'unbalanced'}</small></dd></div><div><dt>Bandwidth</dt><dd>${bwTxt(m.bw)} <small>per ${cpuW(r)}</small></dd></div><div><dt>DIMMs</dt><dd>${m.dimms}</dd></div></dl>`;
+    if (m.dimms) h += statsHtml(r, m);
     const items = [...g.hard.map(x => ['bad', x, ex ? 'fail' : '']), ...g.soft.map(x => ['mid', x.msg, ex ? `−${x.pts}` : ''])];
-    if (!items.length) items.push(['ok', 'Meets the target with the least capacity needed, at the best bandwidth, with the fewest DIMMs.', '']);
+    if (!items.length) items.push(['ok', 'Meets the order with the least capacity needed, at the best bandwidth, with the fewest DIMMs.', '']);
     h += `<ul class="mpfind">${items.map(([c, x, pts]) => `<li class="${c}">${pts ? `<b>${esc(pts)}</b>` : ''}${esc(x)}</li>`).join('')}</ul>`;
     if (ex) { const sc = g.fail ? 0 : Math.max(0, 100 - 10 * t.errors - g.penalty);
       h += `<p class="mpscore">Score: <b>${sc}</b> of 100. ${g.fail ? 'An unsupported layout or too little capacity fails the exam.' : g.penalty ? `Points off: ${g.penalty} for the plan.` : 'No points off.'} Pass mark 70.</p>`; }
@@ -215,21 +303,25 @@ const MemPlan = (() => {
   function tray(t) {
     const r = R();
     if (closed(t)) return `<h2>Exam rules</h2><ul class="rules"><li>Distribute, the marks on the board and the hints are off until you verify.</li><li>An unsupported layout, or less capacity than the order asks for, fails.</li><li>A supported layout passes. Points off: 20 if a faster layout was possible at the needed capacity, 10 for more capacity than needed, 10 for more DIMMs than needed.</li><li>Pass mark 70.</li></ul>`;
-    return `<h2>How the board ranks</h2><ol class="rules"><li>At least the target capacity, and no more than the least a supported layout gives.</li><li>The highest memory bandwidth: layouts within 5 % count as equal.</li><li>The fewest DIMMs.</li></ol><p class="cap">Bandwidth is the theoretical peak per processor: interleaved channels × transfer rate × 8 bytes. Unequal channels split the memory into interleave regions, which lowers it.</p><h3>Rules for this server</h3><ul class="rules">${r.rules.map(x => `<li>${esc(x)}</li>`).join('')}</ul><p class="cap" style="margin-top:6px">${esc(r.sources)}</p>${t.rd ? '' : '<p class="cap">Random Exam draws a work order here; for a graded exam, pick the RAM Distributor exam in the Lab menu.</p>'}`;
+    return `<h2>How to use the board</h2><ol class="rules"><li>Choose the ${cpuW(r)}s installed and the DIMM size.</li><li>Choose the memory: the list offers only the totals that DIMM builds in a layout the vendor supports.</li><li>Place the DIMMs on the map, in the vendor's order, or press Distribute to see the layout.</li><li>Verify Distribution checks the board against the vendor's layout.</li></ol><h3>Rules for this server</h3><ul class="rules">${r.rules.map(x => `<li>${esc(x)}</li>`).join('')}</ul><p class="cap" style="margin-top:6px">${esc(r.sources)}</p><p class="cap">Random Exam draws a work order: any DIMM sizes, ranked by capacity, then bandwidth, then the fewest DIMMs.${t.rd || t.mpLab ? '' : ' For a graded exam, pick the RAM Distributor exam in the Lab menu.'}</p>`;
   }
 
   /* ---- actions and fields ---- */
-  const toInt = v => { const n = parseInt(String(v).trim(), 10); return Number.isFinite(n) && n >= 0 ? n : NaN; };
   const locked = () => { const w = woOf(T); return w && w.exam && w.submitted && T.rd ? say('info', 'The exam is submitted: the board is locked.') || true : false; };
-  // any change to the board takes back an earlier verification
+  // any change to the board or the setup takes back an earlier verification
   const changed = () => { const h = hold(T); h.snap = null; if (T.rd) T.rd.confirm = false; };
+  // a practice setup that no longer offers the chosen memory size drops it
+  const keepGb = (r, s) => { if (s.gb && !choices(r, s.cpus, s.part).some(o => o.gb === s.gb)) s.gb = null; };
   CORE.mpCpus = n => {
     const r = R(), s = st(T); if (woOf(T)) return say('info', 'The work order sets the processors.');
     s.cpus = +n === 1 ? 1 : 2; if (s.cpus === 1) s.board = [s.board[0]].concat(full(r, []).slice(1));
-    changed(); say('info', `${pl(s.cpus, cpuW(r))} installed.`);
+    keepGb(r, s); changed(); say('info', `${pl(s.cpus, cpuW(r))} installed.${s.gb ? '' : ' Choose the memory size.'}`);
   };
-  CORE.mpQuick = gb => { const s = st(T); if (woOf(T)) return; s.gb = +gb; s.gbIn = String(gb); say('info', `Target: ${gb} GB. Distribute fills the board with the best layout, or place the DIMMs yourself.`); };
-  CORE.mpPart = k => { const r = R(); if (!r.part(k) || locked()) return; st(T).part = k; say('info', `Placing ${r.part(k).short}s (${r.part(k).pid}).`); };
+  CORE.mpPart = k => {
+    const r = R(), s = st(T); if (!r.part(k) || locked()) return;
+    s.part = k; if (!woOf(T)) { keepGb(r, s); changed(); }
+    say('info', `DIMM to place: ${r.part(k).short} (${r.part(k).pid}).${!woOf(T) && !s.gb ? ' Choose the memory size.' : ''}`);
+  };
   CORE.mpSlot = a => {
     const r = R(), s = st(T), k = taskOf(T), [c, pos] = String(a).split(':').map(Number); if (locked() || !s.board[c] || !(pos >= 0 && pos < r.slots)) return;
     if (c >= k.cpus) return say('warn', `${r.cpuName(c)} is not installed: its slots are not used.`);
@@ -240,13 +332,14 @@ const MemPlan = (() => {
   };
   CORE.mpClear = () => { const r = R(); if (locked()) return; st(T).board = full(r, []); changed(); say('info', 'Board cleared.'); };
   CORE.mpDist = () => {
-    const r = R(), s = st(T); if (closed(T)) return say('info', 'Distribute is off in an exam until you verify the distribution.');
+    const r = R(), s = st(T), w = woOf(T); if (closed(T)) return say('info', 'Distribute is off in an exam until you verify the distribution.');
     if (T.rd && T.rd.submitted) return locked();
-    if (!woOf(T)) { const n = toInt(s.gbIn || s.gb); if (!n) return say('warn', 'Type the target capacity, in GB.'); s.gb = n; s.gbIn = String(n); }
-    const k = taskOf(T), p = plan(r, k.cpus, k.gb), b = p.best[0];
-    if (!b) return say('warn', `No supported layout reaches ${k.gb} GB with ${pl(k.cpus, cpuW(r))}: the most this server holds is ${p.max} GB.`);
-    s.board = full(r, b.maps.map(m => m.slice())); changed();
-    say('ok', `Distributed for ${k.gb} GB${p.exact ? '' : ` (the least a supported layout gives is ${p.need} GB)`}: ${title(r, b.maps)}, ${where(r, b.map, k.cpus)}. ${b.m.speed} ${r.unit || 'MT/s'}, ${bwTxt(b.m.bw)} per ${cpuW(r)}.`);
+    if (!w && !s.gb) return say('warn', 'Choose the memory size first.');
+    const g = target(T), k = taskOf(T);
+    if (!g) return say('warn', `No supported layout reaches ${k.gb} GB with ${pl(k.cpus, cpuW(r))}.`);
+    s.board = g.map(m => m.slice()); changed();
+    const m = metrics(r, g.slice(0, k.cpus));
+    say('ok', `Distributed ${k.gb} GB: ${title(r, g.slice(0, k.cpus))}, ${where(r, g[0], k.cpus)}. ${m.speed} ${r.unit || 'MT/s'}, ${bwTxt(m.bw)} per ${cpuW(r)}.`);
   };
   CORE.mpVerify = a => {
     const r = R(), s = st(T), d = T.rd, w = woOf(T);
@@ -258,18 +351,21 @@ const MemPlan = (() => {
       T.grade = { penalty: g.penalty, fail: g.fail, why: g.fail ? g.hard[0] : g.soft.map(x => x.msg).join(' '), best: g.best };
       return say(g.fail ? 'warn' : 'ok', g.fail ? `Submitted. Not supported: ${g.hard[0]}` : g.best ? 'Submitted: the best layout for this order.' : `Submitted: supported, ${g.penalty} points off the plan.`);
     }
+    if (!w && !s.gb) return say('warn', 'Choose the memory size first: Verify checks the board against the vendor\'s layout for it.');
     hold(T).snap = snapOf(s.board); if (w && w.exam) w.submitted = true;
     const g = checked(T), U = r.unit || 'MT/s';
+    if (g.practice) return say(g.ok ? 'ok' : 'warn', g.ok ? `Correct: ${s.gb} GB in the vendor's layout, ${g.m.speed} ${U}.` : `Not yet: ${g.items[0][1]}`);
     say(g.fail ? 'warn' : 'ok', g.fail ? `Not supported: ${g.hard[0]}` : g.best ? `Verified: ${g.m.gb} GB at ${g.m.speed} ${U}, the best layout for ${taskOf(T).gb} GB.` : `Verified: supported, ${g.m.gb} GB at ${g.m.speed} ${U}, but a better layout exists. ${g.soft.map(x => x.msg).join(' ')}`);
   };
   CORE.mpExam = () => {
     const r = R(), s = st(T); if (T.rd) return;
-    const k = draw(r, 'board'); s.wo = woNew(k, true); s.cpus = k.cpus; s.gb = k.gb; s.board = full(r, []); s.snap = null;
+    const k = draw(r, 'board'); s.wo = woNew(k, true); s.board = full(r, []); s.snap = null;
     say('info', `Random exam, work order ${s.wo.ref}: at least ${k.gb} GB with ${pl(k.cpus, cpuW(r))}. Place the DIMMs, then verify the distribution.`);
   };
-  CORE.mpExamEnd = () => { const s = st(T); if (T.rd || !s.wo) return; s.wo = null; s.snap = null; say('info', 'Exam left: the board is a planner again.'); };
+  CORE.mpExamEnd = () => { const s = st(T); if (T.rd || !s.wo) return; s.wo = null; s.snap = null; say('info', 'Exam left: back to the practice setup.'); };
 
-  /* ---- the labs: a work order drawn at random from the model's tricky cases; practice (Distribute and cues) or exam ---- */
+  /* ---- the labs: practice (the student's own setup) and the exam (a work order drawn at random from the model's tricky
+     cases) ---- */
   const C = (act, arg, say) => ({ act, arg, say });
   const lastCase = {};
   const test = { k: null };   // tests: force a work order (index into the model's tasks)
@@ -280,37 +376,45 @@ const MemPlan = (() => {
     lastCase[r.id + id] = k; return Object.assign({ k }, pool[k]);
   }
   const woNew = (k, ex) => ({ gb: k.gb, cpus: k.cpus, why: k.why, ref: `RD-${String(k.gb).padStart(4, '0')}-${k.cpus}P`, exam: !!ex, snap: null, submitted: false, confirm: false });
-  // the cues to place a layout on the board: take out what does not belong, then fill each processor in the vendor's order
+  // the cues to place a layout on the board: take out what does not belong, then fill in the vendor's order over the server
   function boardCue(t, maps) {
     const r = R(), s = st(t), b = s.board; if (!maps) return null;
-    for (let c = 0; c < r.cpus; c++) for (const pos of r.fill) if (b[c][pos] && !maps[c][pos]) return C('mpSlot', `${c}:${pos}`, `Take the DIMM out of ${r.slotName(c, pos)}: it is not in the layout. Click it.`);
-    for (let c = 0; c < r.cpus; c++) for (const pos of r.fill) {
+    for (const [c, pos] of order(r, r.cpus)) if (b[c][pos] && !maps[c][pos]) return C('mpSlot', `${c}:${pos}`, `Take the DIMM out of ${r.slotName(c, pos)}: it is not in the layout. Click it.`);
+    for (const [c, pos] of order(r, r.cpus)) {
       const want = maps[c][pos]; if (!want || b[c][pos] === want) continue;
-      return s.part !== want ? C('mpPart', want, `Choose the ${r.part(want).short} (DIMM to place).`) : C('mpSlot', `${c}:${pos}`, `Place a ${r.part(want).short} in ${r.slotName(c, pos)}.`);
+      return s.part !== want ? C('mpPart', want, `Choose the ${r.part(want).cap} GB DIMM.`) : C('mpSlot', `${c}:${pos}`, `Place a ${r.part(want).short} in ${r.slotName(c, pos)}.`);
     }
     return null;
+  }
+  // practice cue for the setup: the memory size that fills every channel once (or the nearest), for the chosen DIMM
+  function setupCue(t) {
+    const r = R(), s = st(t), os = choices(r, s.cpus, s.part), o = os.find(x => x.n === r.channels) || os[os.length - 1];
+    return { field: 'mp.sel', value: String(o.gb), say: `Choose the memory size: for example ${o.gb} GB, ${o.n} × ${r.part(s.part).cap} GB per ${cpuW(r)}, one DIMM in every channel.` };
   }
   function labScenario(o) {
     const steps = o.exam ? [
       { view: 'rdist', text: 'Place the DIMMs for the work order on the board', done: t => t.rd.submitted || t.rd.confirm, cue: t => boardCue(t, target(t)) || C('mpVerify', '', 'Verify the distribution.') },
       { view: 'rdist', text: 'Verify the distribution: submit the layout', done: t => !!t.rd.submitted, cue: t => C('mpVerify', t.rd.confirm ? 'yes' : '', t.rd.confirm ? 'Confirm: submit the layout.' : 'Verify the distribution.') }]
     : [
-      { view: 'rdist', text: 'Place the DIMMs for the work order on the board', hint: o.hint, done: t => !gradeMaps(R(), st(t).board, t.rd).fail, cue: t => boardCue(t, target(t)) },
-      { view: 'rdist', text: 'Verify the distribution', hint: 'Verify grades the board against the work order: supported, the least capacity needed, the best bandwidth, the fewest DIMMs.', done: t => { const g = checked(t); return !!g && !g.fail; }, cue: () => C('mpVerify', '', 'Verify the distribution.') }];
+      { view: 'rdist', text: `Choose the ${cpuW(R())}s, the DIMM and the memory size`, hint: 'The memory list offers only the totals the chosen DIMM builds in a supported layout.', done: t => !!st(t).gb, cue: setupCue },
+      { view: 'rdist', text: 'Place the DIMMs on the map', hint: o.hint, done: t => { const g = goalOf(t); return !!g && JSON.stringify(g) === JSON.stringify(st(t).board); }, cue: t => boardCue(t, goalOf(t)) },
+      { view: 'rdist', text: 'Verify the distribution', hint: 'Verify checks the board against the vendor\'s layout for your setup, and compares it with the best layout for that capacity.', done: t => { const g = checked(t); return !!g && g.ok; }, cue: () => C('mpVerify', '', 'Verify the distribution.') }];
     return {
       id: o.id, title: o.title, exam: !!o.exam, start: 'rdist', steps,
       get intro() { const d = T && T.rd; const wo = d ? `Work order ${d.ref}: at least ${d.gb} GB of memory, with ${pl(d.cpus, cpuW(R()))} installed. ` : '';
         return wo + (o.exam ? o.examIntro : o.practiceIntro); },
       setup() {
-        const r = R(), k = draw(r, o.id), t = o.setup(k);
-        t.rd = woNew(k, o.exam);
-        t.mp = { gb: k.gb, gbIn: '', cpus: k.cpus, part: r.parts[0].key, board: full(r, []), wo: null, snap: null };
+        const r = R();
+        if (!o.exam) { const t = o.setup({ cpus: r.cpus }); t.mpLab = true; t.mp = null; st(t); return t; }
+        const k = draw(r, o.id), t = o.setup(k);
+        t.rd = woNew(k, true);
+        t.mp = { gb: null, cpus: k.cpus, part: (r.parts[1] || r.parts[0]).key, board: full(r, []), wo: null, snap: null };
         return t;
       }
     };
   }
-  const field = (f, v) => { const s = st(T); if (f === 'mp.gb') { s.gbIn = v; const n = toInt(v); if (n > 0 && !woOf(T)) s.gb = n; } };
-  return { metrics, errors, all, plan, gradeMaps, checked, target, title, orderOf, counts, examText, render, tray, field, st, exam, lab: labScenario, test, TOL, PTS,
+  const field = (f, v) => { const s = st(T); if (f === 'mp.sel' && !woOf(T)) { const n = parseInt(v, 10); s.gb = n > 0 ? n : null; changed(); } };
+  return { metrics, errors, all, plan, gradeMaps, checked, target, choices, title, orderOf, counts, examText, render, tray, field, st, exam, lab: labScenario, test, TOL, PTS,
     view: o => Object.assign({ render, tray, actions: () => [] }, o) };
 })();
 Sim.memRules = r => { REG().mem = r; };

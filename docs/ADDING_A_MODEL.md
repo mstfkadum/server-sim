@@ -94,23 +94,25 @@ A cue points at what to click next (`{act, arg, say}`) or what to type (`{field,
 **RAM Distributor (optional):** a pack that wants the board and its two labs gives the engine its memory rules with
 `Sim.memRules(rules)`, registers the view with `Sim.registerView(MemPlan.view({ id: 'rdist', title: 'RAM Distributor',
 keep }))`, and builds the practice and exam scenarios with `MemPlan.lab({ id, title, exam, practiceIntro or examIntro,
-hint, setup })`: `setup(order)` returns the server's state for a work order (the plan itself is made on the board).
+hint, setup })`: `setup(order)` returns the server's state (`order.cpus` processors; the plan itself is made on the
+board). The practice lets the student choose the processors, the DIMM and the memory size, from the sizes one DIMM
+type builds in a supported layout (`MemPlan.choices`); the exam draws a work order from `tasks`.
 The two packs' `views-rdist.js` are complete examples. The rules object holds:
 
 - the server: `id`, `server` (one line), `cpus`, `slots` (per CPU), `channels`, `chanOf(pos)`, `fill` (the slot order,
   every position), `unit` ('MHz' or 'MT/s'), `cpuWord`, `cpuName(c)`, `slotName(c, pos)`, `slotList(positions, cpus)`,
-  `facts(cpus)`, `defaultGb`, `quick` (the quick capacities);
-- the board: `board.chans` (one group per channel: `label(c)` and its slot positions, left to right), optional
-  `board.split` (a gap before that group, where the processor sits), `board.slot(pos)` (`{ num, tone }`, tone 'blue',
-  'black' or 'white'), `board.note` (the population rule under the title) and `board.legend` (three texts for the
-  ok, part and bad marks);
+  `facts(cpus)`, `defaultGb`;
+- the board, drawn as it sits in the server (top view, rear at the top): `board.layout` (left to right: `{ c, pos }` for
+  a slot, `{ cpu: c }` for a processor, `{ gap: true }` for a small space), `board.slot(pos)` (`{ tone }`: 'blue',
+  'black' or 'white'), `board.label(c, pos)` (the text under the slot), `board.note` (the population rule under the
+  title) and `board.legend` (three texts for the ok, part and bad marks);
 - the parts: `parts` (key, part number, name, short name, capacity, organisation; the labs use 16, 32 and 64 GB) and
   `part(key)`; optional `excludedNote`;
 - the rules: `checkCpu(map, c)` and `checkServer(maps, cpus)` return the errors for one CPU and for the server (a map
   is one array per CPU, a part key or null per slot), `typeErrs(map, c)` (the type errors of a CPU so far, for the
   marks), optional `countOk(map)` (a supported count), `speed(maps)`, `note(maps)`, `candidates()` (every layout to
   consider for one CPU), `rules` (the text shown on the page) and `sources`;
-- `tasks`: the work orders for practice and the exam (and Random Exam), `{ cpus, gb, why }`, where `why` explains the
+- `tasks`: the work orders for the exam (and Random Exam), `{ cpus, gb, why }`, where `why` explains the
   best layout.
 
 Use the same functions for the board as for the pack's Memory view (fill order, mixing checks), so the plan, the
@@ -201,9 +203,10 @@ With Node.js and Playwright installed (`npm i playwright`):
   whose centre is covered by another element.
 - `node tests/two-models.js` builds the template pack next to the real ones and checks that switching models keeps
   state, timers and listeners apart.
-- `node tests/ram-distributor.js dist/index.html` runs every RAM Distributor work order of both models in practice and
-  in the exam, grades about twenty-five hand-made layouts (unsupported, slower, too much capacity, too many DIMMs), and
-  checks the board's buttons (Distribute, Clear Board, Random Exam, Verify Distribution) and the manual placement.
+- `node tests/ram-distributor.js dist/index.html` runs every RAM Distributor exam work order of both models,
+  the practice for every processor count and DIMM size, grades about twenty-five hand-made layouts
+  (unsupported, slower, too much capacity, too many DIMMs), and checks the board: the memory list, the buttons, the
+  manual placement and the one "next" marker.
 - `node tests/os-install.js dist/index.html` runs the OS install mistakes (wrong image, wrong disk, a port without a
   link, the management network on the wrong adapter, wrong handover values) and checks the shells' answers against the
   twin.

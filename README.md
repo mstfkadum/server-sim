@@ -37,22 +37,27 @@ see `docs/ADDING_A_MODEL.md`.
 
 A memory planning board and test for both servers, from the vendors' own population rules, with three DIMM sizes per
 server: 16, 32 and 64 GB (Cisco: 16 GB and 32 GB RDIMM, 64 GB LRDIMM; HPE: 16 GB 1Rx8, 32 GB 2Rx8, 64 GB 2Rx4 RDIMM).
-The page is one board: a Target GB box with **Distribute**, the choice of one or two processors, **Clear Board**,
-**Random Exam** and **Verify Distribution**, quick capacities (a star marks one where no layout fills every channel
-equally), then the population map of both processors. The student picks a DIMM size and clicks the slots to place it
-by hand (a click on a fitted slot with the same size takes it out). Distribute fills the board with the best layout
-for the target; Verify Distribution grades what is on the board. Three ways to use it:
+The page is one board. At the top: the processors (1 or 2), the DIMM size, the memory size, **Distribute**, **Clear
+Board**, **Random Exam** and **Verify Distribution**. The memory list offers only the totals the chosen DIMM builds in a
+layout the vendor supports (for example 1 to 12 per CPU on the Cisco; 1, 2, 4, 6, 8, 12 or 16 per processor on the
+HPE), and marks the ones that fill every channel. Below is the population map, drawn as the board sits in the server,
+seen from above with the rear at the top: on the Cisco the sockets G H, CPU 2, F E C D, CPU 1, B A; on the HPE
+processor 2 on the left with its slots 1 to 8 and 9 to 16 either side of it, then processor 1 the same, numbered as on
+the service label. The student clicks the slots to place the chosen DIMM (a click on a fitted slot with the same size
+takes it out). With guidance on, one slot at a time is marked as the next one, in the vendor's order over the server
+(Cisco: A1, E1, B1, F1 ...; HPE: slot 10 of processor 1, then of processor 2, then 3 ...). Three ways to use it:
 
-- **Planner** (the RAM Distributor in the left menu of any lab): any target, Distribute and Verify; Random Exam draws a
-  work order on the board, with Distribute and the marks off until it is verified. Nothing is recorded.
-- **Practice** (Cisco Lab 9, HPE Lab 3): a random work order (capacity and processors). Place the DIMMs, then verify.
-  Distribute is open, so the best layout can be looked up.
+- **Planner** (the RAM Distributor in the left menu of any lab) and **Practice** (Cisco Lab 9, HPE Lab 3): the student
+  chooses the setup, places the DIMMs (or presses Distribute to see the layout) and verifies. Verify checks the board
+  against the vendor's layout for that setup, and says whether another DIMM size gives the same capacity faster or
+  with fewer DIMMs. Random Exam in the planner draws a work order on the board, with Distribute and the marks off until
+  it is verified; nothing is recorded.
 - **Exam** (Cisco Lab 10, HPE Lab 4): a random work order from a set of tricky cases (a capacity no single DIMM size
-  fills, a capacity that cannot be met exactly, a count the vendor does not support, one processor only). Guidance,
-  Distribute and the marks on the board are off until the student verifies, which submits the layout. The best layout
-  is shown after.
+  fills, a capacity that cannot be met exactly, a count the vendor does not support, one processor only). Any of the
+  three sizes may be used, mixed where the vendor allows. Guidance, Distribute and the marks on the board are off until
+  the student verifies, which submits the layout. The best layout is shown after.
 
-Best means, in this order: at least the capacity ordered and no more than the least a supported layout gives; then the
+For the exam, best means, in this order: at least the capacity ordered and no more than the least a supported layout gives; then the
 fastest (memory bandwidth within 5 % of the best); then the fewest DIMMs. Exam grading: an unsupported layout or less
 capacity than ordered fails (score 0). A supported layout passes with points off: 20 if a faster layout was possible,
 10 for more capacity than needed, 10 for more DIMMs than needed. Pass mark 70.

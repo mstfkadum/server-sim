@@ -37,7 +37,7 @@ const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '.
       // waiting is allowed longer: a server's POST, an installer's progress and an OS boot take a while
       if (same > (st.wait ? 400 : 40)) { stall = st; break; }
       if (st.wait) { await p.waitForTimeout(350); continue; }
-      if (st.field) { const loc = p.locator(`#stage [data-field="${st.field}"]`).first(); await loc.fill(String(st.value)); continue; }
+      if (st.field) { const loc = p.locator(`#stage [data-field="${st.field}"]`).first(); if (await loc.evaluate(e => e.tagName === 'SELECT')) await loc.selectOption(String(st.value)); else await loc.fill(String(st.value)); continue; }
       if (st.answer) { await p.evaluate(a => Sim.do(a[0], a[1]), st.answer); continue; }
       const sel = st.sel || st.q;
       // prefer the picture target (its .zone child), then the tray, then the action buttons
