@@ -302,8 +302,8 @@ const MemPlan = (() => {
   }
   function tray(t) {
     const r = R();
-    if (closed(t)) return `<h2>Exam rules</h2><ul class="rules"><li>Distribute, the marks on the board and the hints are off until you verify.</li><li>An unsupported layout, or less capacity than the order asks for, fails.</li><li>A supported layout passes. Points off: 20 if a faster layout was possible at the needed capacity, 10 for more capacity than needed, 10 for more DIMMs than needed.</li><li>Pass mark 70.</li></ul>`;
-    return `<h2>How to use the board</h2><ol class="rules"><li>Choose the ${cpuW(r)}s installed and the DIMM size.</li><li>Choose the memory: the list offers only the totals that DIMM builds in a layout the vendor supports.</li><li>Place the DIMMs on the map, in the vendor's order, or press Distribute to see the layout.</li><li>Verify Distribution checks the board against the vendor's layout.</li></ol><h3>Rules for this server</h3><ul class="rules">${r.rules.map(x => `<li>${esc(x)}</li>`).join('')}</ul><p class="cap" style="margin-top:6px">${esc(r.sources)}</p><p class="cap">Random Exam draws a work order: any DIMM sizes, ranked by capacity, then bandwidth, then the fewest DIMMs.${t.rd || t.mpLab ? '' : ' For a graded exam, pick the RAM Distributor exam in the Lab menu.'}</p>`;
+    if (closed(t)) return `${r.population || ''}<h2>Exam rules</h2><ul class="rules"><li>Distribute, the marks on the board and the hints are off until you verify.</li><li>An unsupported layout, or less capacity than the order asks for, fails.</li><li>A supported layout passes. Points off: 20 if a faster layout was possible at the needed capacity, 10 for more capacity than needed, 10 for more DIMMs than needed.</li><li>Pass mark 70.</li></ul>`;
+    return `${r.population || ''}<h2>How to use the board</h2><ol class="rules"><li>Choose the ${cpuW(r)}s installed and the DIMM size.</li><li>Choose the memory: the list offers only the totals that DIMM builds in a layout the vendor supports.</li><li>Place the DIMMs on the map, in the vendor's order, or press Distribute to see the layout.</li><li>Verify Distribution checks the board against the vendor's layout.</li></ol><h3>Rules for this server</h3><ul class="rules">${r.rules.map(x => `<li>${esc(x)}</li>`).join('')}</ul><p class="cap" style="margin-top:6px">${esc(r.sources)}</p><p class="cap">Random Exam draws a work order: any DIMM sizes, ranked by capacity, then bandwidth, then the fewest DIMMs.${t.rd || t.mpLab ? '' : ' For a graded exam, pick the RAM Distributor exam in the Lab menu.'}</p>`;
   }
 
   /* ---- actions and fields ---- */
@@ -327,6 +327,7 @@ const MemPlan = (() => {
     if (c >= k.cpus) return say('warn', `${r.cpuName(c)} is not installed: its slots are not used.`);
     const was = s.board[c][pos], part = r.part(s.part), name = r.slotName(c, pos);
     s.board[c][pos] = was === s.part ? null : s.part; changed();
+    Sim.sound(was === s.part ? 'clipOpen' : 'dimm');
     const [tone, msg] = closed(T) ? ['info', ''] : status(r, T);
     say(tone, `${was === s.part ? `${part.short} taken out of ${name}.` : was ? `${r.part(was).short} in ${name} replaced by a ${part.short}.` : `${part.short} in ${name}.`}${msg ? ' ' + msg : ''}`);
   };

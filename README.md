@@ -45,7 +45,9 @@ seen from above with the rear at the top: on the Cisco the sockets G H, CPU 2, F
 processor 2 on the left with its slots 1 to 8 and 9 to 16 either side of it, then processor 1 the same, numbered as on
 the service label. The student clicks the slots to place the chosen DIMM (a click on a fitted slot with the same size
 takes it out). With guidance on, one slot at a time is marked as the next one, in the vendor's order over the server
-(Cisco: A1, E1, B1, F1 ...; HPE: slot 10 of processor 1, then of processor 2, then 3 ...). Three ways to use it:
+(Cisco: A1, E1, B1, F1 ...; HPE: slot 10 of processor 1, then of processor 2, then 3 ...). The side panel shows the vendor's
+population table (the slots for each count), in practice and in the exam, so the plan need not be memorised; each
+DIMM clicks into place with a sound (Sound on). Three ways to use it:
 
 - **Planner** (the RAM Distributor in the left menu of any lab) and **Practice** (Cisco Lab 9, HPE Lab 3): the student
   chooses the setup, places the DIMMs (or presses Distribute to see the layout) and verifies. Verify checks the board

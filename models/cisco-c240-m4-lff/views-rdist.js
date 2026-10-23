@@ -20,6 +20,7 @@ const CIS_RULES = {
     note: 'Minimum: 1 DIMM per CPU, in A1 and E1 (2 in all). Order: blue #1 sockets first, alternating CPUs (A1, E1, B1, F1 ... D1, H1), then black #2, then white #3.',
     legend: ['in Cisco\'s order, both CPUs alike', 'in order, other CPU not matching yet', 'wrong socket or mixed type'] },
   facts: cpus => [['Processors', `${cpus} x Xeon E5-2680 v4`], ['Sockets', '12 per CPU, 4 channels of 3'], ['Speed', '2400 MHz; 3 per channel 2133, or 1866 with dual-rank RDIMMs'], ['DIMMs', 'Cisco DDR4-2400: 16 and 32 GB RDIMM, 64 GB LRDIMM']],
+  population: POP_HTML_C,
   rules: ['Per CPU: 1 to 12 DIMMs in Cisco\'s order: blue #1 in A to D, then black #2, then white #3.',
     'Both CPUs identical: the same DIMMs in the same positions (A1 and E1, B1 and F1 ...).',
     'Never mix RDIMMs and LRDIMMs: the 64 GB LRDIMM never shares the server with the 16 GB or 32 GB RDIMM.',
