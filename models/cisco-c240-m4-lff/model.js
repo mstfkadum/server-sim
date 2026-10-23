@@ -26,14 +26,16 @@ function newCimc() {
     consoleLogin: false, verified: false, guiPw: false, loggedOut: false, reloginNew: false, form: {},
     net: { mode: 'Shared LOM EXT', card: 'Riser1', red: 'Active-active', ipv4: true, ipv6: false, dhcp: true, host: 'C240-' + WO.serial, ip: '0.0.0.0', mask: '0.0.0.0', gw: '0.0.0.0', dns: '0.0.0.0', vlan: false, vlanId: '1', prio: '0', ddns: true, ddnsDom: '' } };
 }
+// the DIMMs in the box of every lab with memory: 16 GB RDIMM, 32 GB RDIMM, 64 GB LRDIMM (24 of each)
+const MEMKIT_C = ['r16', 'r32', 'l64'];
 const CATALOG = {
   // C240 M4: Intel Xeon E5-2600 v4 in LGA2011-3 sockets; one Cisco heatsink fits every supported CPU
   cpus: [
     { id: 'e2680', pid: 'UCS-CPU-E52680E', name: 'Intel Xeon E5-2680 v4', socket: 'LGA2011-3', cores: 14, ghz: 2.4, watts: 120, mem: 2400 },
     { id: 'e2640', pid: 'UCS-CPU-E52640E', name: 'Intel Xeon E5-2640 v4', socket: 'LGA2011-3', cores: 10, ghz: 2.4, watts: 90, mem: 2133 },
     { id: 'g6248', pid: 'UCS-CPU-I6248 (from a C240 M5)', name: 'Intel Xeon Gold 6248', socket: 'LGA3647', cores: 20, ghz: 2.5, watts: 150, mem: 2933 }],
-  // Cisco's DDR4-2400 DIMMs for this server (spec sheet, table 7): the build and memory labs use the 16 GB RDIMM and the
-  // 64 GB LRDIMM; the RAM Distributor offers all six
+  // Cisco's DDR4-2400 DIMMs for this server (spec sheet, table 7): every lab with memory, the RAM Distributor included,
+  // uses three of them (MEMKIT_C): the 16 GB and 32 GB RDIMMs and the 64 GB LRDIMM
   dimms: [
     { id: 'r8', pid: 'UCS-MR-1X081RV-A', name: 'Cisco 8 GB DDR4-2400 RDIMM, single rank', short: '8 GB 1R RDIMM', label: '8GB 1Rx4 PC4-2400T-RA1-11', cap: 8, ranks: 1, width: 4, gen: 'DDR4', type: 'RDIMM', speed: 2400, cisco: true, detail: 'Synchronous Registered (Buffered)' },
     { id: 'r16s', pid: 'UCS-MR-1X161RV-A', name: 'Cisco 16 GB DDR4-2400 RDIMM, single rank', short: '16 GB 1R RDIMM', label: '16GB 1Rx4 PC4-2400T-RA1-11', cap: 16, ranks: 1, width: 4, gen: 'DDR4', type: 'RDIMM', speed: 2400, cisco: true, detail: 'Synchronous Registered (Buffered)' },
@@ -73,7 +75,7 @@ function fresh() {
     cpu: [0, 1].map(newSock),
     bench: { cpu: null, rot: 90, hs: null, tool: null },
     // dimms: socket to { id, fault }; memKit: DIMMs of each model on the mat (one model may be in hand, sel.dimm)
-    dimms: {}, quiz: {}, memLev: {}, memKit: { r16: 24, l64: 24 }, dimmSeen: {},
+    dimms: {}, quiz: {}, memLev: {}, memKit: Object.fromEntries(MEMKIT_C.map(k => [k, 24])), dimmSeen: {},
     sel: { dimm: null, socket: 0, bay: 0, port: null, card: null, psu: null },
     riser: newRiser(),
     bays: Array.from({ length: PROFILE.bays }, () => ({ st: 'blank', drive: null, health: 'ok', member: false, pct: 0 })),

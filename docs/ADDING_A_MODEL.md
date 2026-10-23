@@ -9,7 +9,7 @@ first pack. A new server (for example an HPE ProLiant) is a new folder under `mo
 engine/head.html        page layout, header (Server model and Lab menus) and styles
 engine/fonts.css        the two typefaces, embedded (Instrument Sans, Big Shoulders; SIL Open Font License)
 engine/engine.js        the shared engine: model registry, scenario runner, cues, rendering shell, helpers
-engine/memplan.js       the RAM Distributor: planner, ranking and exam grading, driven by a pack's memory rules
+engine/memplan.js       the RAM Distributor: board, ranking and exam grading, driven by a pack's memory rules
 engine/os-core.js       OS install over virtual media: ISO library, boot logic, handover check, lab steps
 engine/os-ubuntu.js     the Ubuntu Server installer; os-rocky.js the Rocky Linux installer; os-esxi.js ESXi and its DCUI
 engine/os-shell.js      the installed Linux system: console login and a shell that answers from the twin
@@ -91,27 +91,31 @@ Sim.registerScenario({
 A cue points at what to click next (`{act, arg, say}`) or what to type (`{field, value, say}`); the engine draws the
 "Click here" ring and the step bar from it.
 
-**RAM Distributor (optional):** a pack that wants the planner and its two labs gives the engine its memory rules with
+**RAM Distributor (optional):** a pack that wants the board and its two labs gives the engine its memory rules with
 `Sim.memRules(rules)`, registers the view with `Sim.registerView(MemPlan.view({ id: 'rdist', title: 'RAM Distributor',
 keep }))`, and builds the practice and exam scenarios with `MemPlan.lab({ id, title, exam, practiceIntro or examIntro,
-fitView, fitHint, fitCue, setup })`: `setup(order)` returns the open server for a work order and `fitCue(t, maps)` the
-next cue to fit a planned layout. The two packs' `views-rdist.js` are complete examples. The rules object holds:
+hint, setup })`: `setup(order)` returns the server's state for a work order (the plan itself is made on the board).
+The two packs' `views-rdist.js` are complete examples. The rules object holds:
 
-- the server: `id`, `server` (one line), `cpus`, `slots` (per CPU), `channels`, `chanOf(pos)`, `fill` (the slot order),
-  `unit` ('MHz' or 'MT/s'), `cpuWord`, `cpuName(c)`, `slotName(c, pos)`, `slotList(positions, cpus)`, `grid` (rows and
-  columns for the slot map), `facts(cpus)`, `defaultGb`;
-- the parts: `parts` (key, part number, name, short name, capacity, organisation) and `part(key)`; optional
-  `allowed(key)`, `allowedWhy(key)` and `excludedNote` for parts the chassis does not support;
+- the server: `id`, `server` (one line), `cpus`, `slots` (per CPU), `channels`, `chanOf(pos)`, `fill` (the slot order,
+  every position), `unit` ('MHz' or 'MT/s'), `cpuWord`, `cpuName(c)`, `slotName(c, pos)`, `slotList(positions, cpus)`,
+  `facts(cpus)`, `defaultGb`, `quick` (the quick capacities);
+- the board: `board.chans` (one group per channel: `label(c)` and its slot positions, left to right), optional
+  `board.split` (a gap before that group, where the processor sits), `board.slot(pos)` (`{ num, tone }`, tone 'blue',
+  'black' or 'white'), `board.note` (the population rule under the title) and `board.legend` (three texts for the
+  ok, part and bad marks);
+- the parts: `parts` (key, part number, name, short name, capacity, organisation; the labs use 16, 32 and 64 GB) and
+  `part(key)`; optional `excludedNote`;
 - the rules: `checkCpu(map, c)` and `checkServer(maps, cpus)` return the errors for one CPU and for the server (a map
-  is one array per CPU, a part key or null per slot), `speed(maps)`, `note(maps)`, `candidates()` (every layout to
+  is one array per CPU, a part key or null per slot), `typeErrs(map, c)` (the type errors of a CPU so far, for the
+  marks), optional `countOk(map)` (a supported count), `speed(maps)`, `note(maps)`, `candidates()` (every layout to
   consider for one CPU), `rules` (the text shown on the page) and `sources`;
-- the twin: `cpusIn(t)`, `read(t)` (the fitted maps), `deliver(t, order)` (puts an order in the DIMM box) and
-  `kitLeft(t)`;
-- `tasks`: the work orders for practice and the exam, `{ cpus, gb, why }`, where `why` explains the best layout.
+- `tasks`: the work orders for practice and the exam (and Random Exam), `{ cpus, gb, why }`, where `why` explains the
+  best layout.
 
-Use the same functions for the planner as for the pack's Memory view (fill order, mixing checks), so the plan, the
+Use the same functions for the board as for the pack's Memory view (fill order, mixing checks), so the plan, the
 hands-on check and the grade always agree. `node tests/ram-distributor.js` runs every task and a set of hand-made
-layouts against the expected grade.
+layouts against the expected grade, and the board's buttons.
 
 **OS install (optional):** a pack describes its server to the operating system with `Sim.osHost({...})` and
 registers the handover view with `Sim.registerView(OSI.view({ id: 'handover', title: 'OS handover check' }))`. The
@@ -198,7 +202,8 @@ With Node.js and Playwright installed (`npm i playwright`):
 - `node tests/two-models.js` builds the template pack next to the real ones and checks that switching models keeps
   state, timers and listeners apart.
 - `node tests/ram-distributor.js dist/index.html` runs every RAM Distributor work order of both models in practice and
-  in the exam, and grades about thirty hand-made layouts (unsupported, slower, too much capacity, too many DIMMs).
+  in the exam, grades about twenty-five hand-made layouts (unsupported, slower, too much capacity, too many DIMMs), and
+  checks the board's buttons (Distribute, Clear Board, Random Exam, Verify Distribution) and the manual placement.
 - `node tests/os-install.js dist/index.html` runs the OS install mistakes (wrong image, wrong disk, a port without a
   link, the management network on the wrong adapter, wrong handover values) and checks the shells' answers against the
   twin.

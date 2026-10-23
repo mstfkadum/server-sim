@@ -46,10 +46,12 @@ const DIMMK = {};
   .forEach(([key, pid, cap, ranks, width, dram, td]) => { const org = `${ranks}Rx${width}`, kind = td ? '3DS RDIMM' : 'RDIMM';
     DIMMK[key] = { key, pid, cap, ranks, width, dram, td: !!td, org, name: `HPE ${cap} GB ${RANKN[ranks]} Rank x${width} DDR5-4800 Registered${td ? ' 3DS' : ''} Smart Memory`,
       short: `${cap} GB ${org} ${kind}`, tiny: `${cap} GB ${org} ${kind}`, label: `${cap}GB ${org} DDR5-4800 ${kind}`, type: `DDR5 ${kind}` }; });
+// the DIMMs in the box of every lab with memory, the RAM Distributor included: 16 GB 1Rx8, 32 GB 2Rx8, 64 GB 2Rx4
+const MEMKIT_H = ['r16', 'r32', 'r64'];
 const CATALOG = {
   cpu: { pid: 'P49614-B21', name: 'Intel Xeon Gold 6430', short: 'Xeon Gold 6430', cores: 32, ghz: 2.1, watts: 270, socket: 'LGA4677' },
-  // the two DIMM types in the box of the build labs: 32 GB 2Rx8 RDIMMs and 128 GB 3DS RDIMMs, never mixed in one server
-  dimm: DIMMK.r32, dimm3ds: DIMMK.r128,
+  // the DIMM fitted in a built server (8 per processor): the 32 GB 2Rx8 RDIMM
+  dimm: DIMMK.r32,
   ssd: { label: 'SSD SATA DS 960 GB P41523', name: 'HPE 960 GB SATA SSD, SFF basic carrier', short: '960 GB SATA SSD', cap: 960 },
 };
 
@@ -70,8 +72,8 @@ function fresh() {
     // rep: processor 2 being installed or replaced (views-cpurep.js), null when nothing is under way
     sock2: 'phm', nuts2: [1, 1, 1, 1], wires2: 'locked', rep: null, hold: null,
     // dimms: slot to DIMM type (a DIMMK key); memBox: DIMMs still in their packaging, by type; memLeft: unpacked, on the
-    // mat; memPick: the type fitted next. The build labs' box: 32 of each of the two types
-    dimms: {}, memOpen: {}, memBox: { r32: 32, r128: 32 }, memLeft: {}, memPick: 'r32',
+    // mat; memPick: the type fitted next. The box of every lab with memory: 32 of each of the three types (MEMKIT_H)
+    dimms: {}, memOpen: {}, memBox: Object.fromEntries(MEMKIT_H.map(k => [k, MEMKIT])), memLeft: {}, memPick: 'r32',
     bays: Array.from({ length: PROFILE.bays }, () => ({ st: 'drive', health: 'ok', ins: false, rel: false, pct: 100 })),
     // the front drives' volume on the MR416i-o controller: its member bays (a lab value: RAID 6 over the fitted drives)
     vol: { raid: 'RAID 6', members: Array.from({ length: PROFILE.bays }, (_, i) => i) },
@@ -114,7 +116,6 @@ const dimmCount = t => Object.keys(t.dimms).length;
 const dimmKind = v => v === true ? 'r32' : v;
 const dimmOf = (t, id) => DIMMK[dimmKind(t.dimms[id])];
 const memGB = t => Object.keys(t.dimms).reduce((s, id) => s + dimmOf(t, id).cap, 0);
-const oddIn = t => Object.keys(t.dimms).filter(id => dimmKind(t.dimms[id]) === 'r128');
 const cpuCount = t => 1 + (t.sock2 === 'phm' && t.nuts2.every(Boolean) ? 1 : 0);
 const driveCount = t => t.bays.filter(b => b.st === 'drive').length;
 const bayName = i => `Box ${Math.floor(i / 8) + 1}, bay ${(i % 8) + 1}`;

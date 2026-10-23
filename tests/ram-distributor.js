@@ -1,5 +1,6 @@
-// RAM Distributor: every work order of every model, run by its cues in practice and in the exam (both must reach the best
-// layout: practice "best", exam score 100), then hand-made layouts graded against each vendor's rules.
+// RAM Distributor: every work order of every model, placed on the board by its cues in practice and in the exam (both
+// must reach the best layout: practice "best", exam score 100), then hand-made layouts graded against each vendor's
+// rules, then the board's own buttons (Distribute, Clear Board, Random Exam, Verify Distribution) in the planner.
 // Usage: node tests/ram-distributor.js [dist/index.html]
 const { chromium } = require('playwright'), path = require('path');
 const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '..', 'dist', 'index.html'));
@@ -45,15 +46,12 @@ const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '.
     push('HPE 768: 24 x 32 GB 2Rx8 (12 per CPU) is slower', g(2, 768, both(fill(16, H(12), 'r32'))), 20);
     push('HPE 768: 16 x 64 GB is more than needed (faster)', g(2, 768, both(fill(16, H(8), 'r64'))), 10);
     push('HPE 384: 24 x 16 GB needs more DIMMs', g(2, 384, both(fill(16, H(12), 'r16'))), 10);
+    push('HPE 1024: 32 x 32 GB (two per channel) is slower', g(2, 1024, both(fill(16, H(16), 'r32'))), 20);
     push('HPE: 3 DIMMs per processor is not supported', g(2, 96, both(fill(16, [2, 9, 6], 'r32'))), 'fail');
     push('HPE: 8 in the wrong slots', g(2, 512, both(fill(16, [0, 1, 2, 3, 4, 5, 6, 7], 'r32'))), 'fail');
-    push('HPE: 3DS with standard RDIMMs', g(2, 1280, both(mix('r128', 'r32'))), 'fail');
-    push('HPE: x4 with x8 (32 GB 2Rx8 + 32 GB 1Rx4)', g(2, 1024, both(mix('r32', 'r32s'))), 'fail');
+    push('HPE: x4 with x8 (32 GB 2Rx8 + 64 GB 2Rx4)', g(2, 1536, both(mix('r32', 'r64'))), 'fail');
     push('HPE: mix the wrong way round (1R white, 2R black)', g(2, 768, both(mix('r16', 'r32'))), 'fail');
     push('HPE: mix with only 12 slots filled', g(2, 512, both((() => { const m = fill(16, H(12), 'r16'); H(8).forEach(i => { m[i] = 'r32'; }); return m; })())), 'fail');
-    push('HPE: 96 GB with 4 per processor', g(2, 768, both(fill(16, H(4), 'r96'))), 'fail');
-    push('HPE: 256 GB DIMMs in a 24 SFF chassis', g(2, 4096, both(fill(16, H(8), 'r256'))), 'fail');
-    push('HPE: densities mixed (128 GB 2Rx4 32 Gb + 64 GB 2Rx4 16 Gb)', g(2, 3072, both(mix('r128r', 'r64'))), 'fail');
     push('HPE: unbalanced processors', g(2, 512, [fill(16, H(8), 'r32'), fill(16, H(4), 'r32')]), 'fail');
     push('HPE: less than the order', g(2, 1024, both(fill(16, H(8), 'r32'))), 'fail');
     push('HPE: DIMMs on processor 2 with one processor', g(1, 256, both(fill(16, H(8), 'r32'))), 'fail');
@@ -62,20 +60,42 @@ const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '.
     loadModel('cisco-c240-m4-lff', 'install');
     const O = [0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11], CF = (n, rows) => { const m = Array(12).fill(null); O.slice(0, n).forEach((p, i) => { m[p] = rows[Math.floor(i / 4)]; }); return m; };
     push('Cisco 384: 32 GB blue + 16 GB black is the best', g(2, 384, both(CF(8, ['r32', 'r16']))), 'best');
-    push('Cisco 384: 24 x 16 GB 1R (3 per channel) needs more DIMMs', g(2, 384, both(CF(12, ['r16s', 'r16s', 'r16s']))), 10);
-    push('Cisco 384: 24 x 16 GB 2R is slower (1866 MHz)', g(2, 384, both(CF(12, ['r16', 'r16', 'r16']))), 20);
+    push('Cisco 384: 24 x 16 GB (3 per channel, 1866 MHz) is slower', g(2, 384, both(CF(12, ['r16', 'r16', 'r16']))), 20);
+    push('Cisco 384: 12 x 32 GB (unequal channels) is slower', g(2, 384, both(CF(6, ['r32', 'r32']))), 20);
     push('Cisco 768: 24 x 32 GB RDIMM is slower than the LRDIMM', g(2, 768, both(CF(12, ['r32', 'r32', 'r32']))), 20);
-    push('Cisco 768: 24 x 32 GB LRDIMM is the best', g(2, 768, both(CF(12, ['l32', 'l32', 'l32']))), 'best');
-    push('Cisco: RDIMM with LRDIMM', g(2, 384, both(CF(8, ['l32', 'r16']))), 'fail');
-    push('Cisco: fewer ranks in front (1R blue, 2R black)', g(2, 384, both(CF(8, ['r16s', 'r32']))), 'fail');
-    push('Cisco: two LRDIMM sizes', g(2, 768, both(CF(8, ['l64', 'l32']))), 'fail');
+    push('Cisco 768: 12 x 64 GB LRDIMM is the best', g(2, 768, both(CF(6, ['l64', 'l64']))), 'best');
+    push('Cisco: RDIMM with LRDIMM', g(2, 384, both(CF(8, ['l64', 'r16']))), 'fail');
     push('Cisco: out of order (A2 without B1)', g(2, 64, both((() => { const m = Array(12).fill(null); m[0] = 'r16'; m[1] = 'r16'; return m; })())), 'fail');
-    push('Cisco: CPUs not identical', g(2, 256, [CF(4, ['r32']), CF(4, ['l32'])]), 'fail');
+    push('Cisco: CPUs not identical', g(2, 192, [CF(4, ['r32']), CF(4, ['r16'])]), 'fail');
     push('Cisco 512: 16 x 32 GB is as fast but needs more DIMMs', g(2, 512, both(CF(8, ['r32', 'r32']))), 10);
     push('Cisco 1000 GB: 24 x 64 GB is more than needed, and slower (3 per channel)', g(2, 1000, both(CF(12, ['l64', 'l64', 'l64']))), 30);
     return out;
   });
   cases.forEach(c => ok(c.exp === 'best' ? c.best : c.exp === 'fail' ? c.fail : !c.fail && c.pen === c.exp, `${c.name}: ${c.fail ? 'fail' : c.best ? 'best' : '-' + c.pen}${c.msg ? ' | ' + c.msg : ''}`));
+  // the board in the planner (the RAM Distributor of a lab that is not a RAM lab): its buttons and the manual placement
+  for (const m of await p.evaluate(() => Sim.modelOrder)) {
+    const r = await p.evaluate(m => {
+      loadModel(m, 'install'); Sim.do('go', 'rdist'); const R = REG().mem, t = twin(), out = {}, n = b => b.flat().filter(Boolean).length;
+      out.sockets = document.querySelectorAll('#stage .mpk').length === R.cpus * R.slots;
+      Sim.do('mpQuick', String(R.quick[3])); out.quick = t.mp.gb === R.quick[3];
+      const inp = document.querySelector('#stage [data-field="mp.gb"]'); inp.value = '384'; inp.dispatchEvent(new Event('input', { bubbles: true }));
+      Sim.do('mpDist'); const want = MemPlan.target(t); out.dist = JSON.stringify(t.mp.board) === JSON.stringify(want) && t.mp.gb === 384;
+      Sim.do('mpVerify'); const g = MemPlan.checked(t); out.verify = !!g && g.best;
+      Sim.do('mpClear'); out.clear = n(t.mp.board) === 0 && !MemPlan.checked(t);
+      Sim.do('mpCpus', '1'); Sim.do('mpDist'); out.one = n(t.mp.board.slice(1)) === 0 && n(t.mp.board) > 0; Sim.do('mpCpus', '2'); Sim.do('mpClear');
+      // a random exam: Distribute is off until verified; the best layout placed by hand scores 100
+      Sim.do('mpExam'); const w = t.mp.wo; Sim.do('mpDist'); out.examNoDist = !!w && n(t.mp.board) === 0;
+      const goal = MemPlan.target(t); goal.forEach((mm, c) => R.fill.forEach(pos => { if (mm[pos]) { Sim.do('mpPart', mm[pos]); Sim.do('mpSlot', `${c}:${pos}`); } }));
+      Sim.do('mpVerify'); const e = MemPlan.checked(t); out.exam = !!e && e.best && w.submitted && /Score: <b>100<\/b>/.test(document.querySelector('#stage').innerHTML);
+      Sim.do('mpDist'); out.distAfter = n(t.mp.board) > 0;
+      // a click on a fitted slot with the same size takes it out; with another size, replaces it
+      Sim.do('mpExamEnd'); Sim.do('mpClear'); const p0 = R.fill[0];
+      Sim.do('mpPart', R.parts[0].key); Sim.do('mpSlot', `0:${p0}`); Sim.do('mpPart', R.parts[1].key); Sim.do('mpSlot', `0:${p0}`); out.replace = t.mp.board[0][p0] === R.parts[1].key;
+      Sim.do('mpSlot', `0:${p0}`); out.remove = t.mp.board[0][p0] === null && !t.mp.wo;
+      return out;
+    }, m);
+    Object.entries(r).forEach(([k, v]) => ok(v, `${m} board: ${k}`));
+  }
   ok(!errs.length, errs.length ? 'page errors ' + JSON.stringify(errs) : 'no page errors');
   await b.close(); process.exit(fails ? 1 : 0);
 })();
