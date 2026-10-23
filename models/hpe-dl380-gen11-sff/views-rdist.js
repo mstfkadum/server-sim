@@ -20,6 +20,7 @@ const HPE_RULES = {
     note: 'Minimum: 1 DIMM per processor, in slot 10 (2 in all). Per processor 1, 2, 4, 6, 8, 12 or 16 DIMMs, in HPE\'s order: 10, 3, then 7, 14, then 5, 16, then 1, 12 (every white slot), then the black slots; processor 2 the same as processor 1.',
     legend: ['in an HPE layout, both processors alike', 'in order, count or other processor not finished', 'wrong slot or type'] },
   facts: cpus => [['Processors', `${cpus} x Xeon Gold 6430`], ['Slots', '16 per processor, 8 channels of 2'], ['Speed', '4800 MT/s; 4400 with 2 per channel'], ['DIMMs', 'HPE DDR5-4800 RDIMM: 16, 32 and 64 GB']],
+  population: POP_HTML_H,
   rules: ['Per processor: 1, 2, 4, 6, 8, 12 or 16 DIMMs, each count in its own slots (the table in the Memory view). Other counts may not boot.',
     'Both processors the same: HPE splits the DIMMs evenly over the processors.',
     'One DIMM per channel runs at 4800 MT/s; two per channel (12 or 16 per processor) at 4400 MT/s, with the Xeon Gold 6430.',

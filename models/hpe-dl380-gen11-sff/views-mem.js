@@ -218,6 +218,8 @@ function popTable(t, X, Y) {
   wrapTxt(msg, 66).slice(0, 5).forEach((l, i) => { g += `<text x="${X + 14}" y="${Y + 166 + i * 14}" class="ss" style="font-size:11px;fill:${tone === 'warn' ? '#FF9F8F' : tone === 'ok' ? '#9FE8B8' : '#C5CCD3'}">${esc(l)}</text>`; });
   return g;
 }
+// HPE's population table: the Memory view and the RAM Distributor show it beside the work
+const POP_HTML_H = `<h3>Population (HPE, 4th Gen Xeon, 16 slots per processor)</h3><table class="dec"><tr><td>1</td><td>10</td></tr><tr><td>2</td><td>3, 10</td></tr><tr><td>4</td><td>3, 7, 10, 14</td></tr><tr><td>6</td><td>3, 5, 7, 10, 14, 16</td></tr><tr><td>8</td><td>1, 3, 5, 7, 10, 12, 14, 16</td></tr><tr><td>12</td><td>1, 2, 3, 5, 6, 7, 10, 11, 12, 14, 15, 16</td></tr><tr><td>16</td><td>1 to 16</td></tr></table><p class="cap" style="margin-top:6px">DIMMs per processor, then the slots; both processors the same. Other counts are not supported. Source: HPE server memory population rules for Gen11 (hpe.com/docs/server-memory).</p>`;
 Sim.registerView({
   id: 'mem', title: 'Memory',
   keep: [
@@ -252,7 +254,7 @@ Sim.registerView({
     const head = !ks.length ? 'No DIMMs left in the kit.' : !un ? `Three HPE DIMM types for this server, ${MEMKIT} of each, in their antistatic packaging: 16 GB, 32 GB and 64 GB. Use one type in the whole server.`
       : `Use one type in the whole server: the 64 GB 2Rx4 is x4, the others x8, and HPE does not mix x4 with x8. Next DIMM you fit: <b>${cur.short}</b>.`;
     return `<h2>DIMM kit</h2><p class="cap" style="font-size:12.5px;margin:0">${head}</p>${mx ? `<p class="cap" style="font-size:12.5px;margin:6px 0 0;color:var(--red)"><b>Unsupported mix in the server.</b> The Memory view marks the DIMMs in red.</p>` : ''}${ks.map(card).join('')}
-      <h3>Population (HPE, 4th Gen Xeon, 16 slots per processor)</h3><table class="dec"><tr><td>1</td><td>10</td></tr><tr><td>2</td><td>3, 10</td></tr><tr><td>4</td><td>3, 7, 10, 14</td></tr><tr><td>6</td><td>3, 5, 7, 10, 14, 16</td></tr><tr><td>8</td><td>1, 3, 5, 7, 10, 12, 14, 16</td></tr><tr><td>12</td><td>1, 2, 3, 5, 6, 7, 10, 11, 12, 14, 15, 16</td></tr><tr><td>16</td><td>1 to 16</td></tr></table><p class="cap" style="margin-top:6px">DIMMs per processor, then the slots; both processors the same. Other counts are not supported. Source: HPE server memory population rules for Gen11 (hpe.com/docs/server-memory).</p>${lab ? '' : '<h3>Minimum for this build</h3><p class="cap" style="font-size:13px">2 DIMMs: 1 per processor, in slot 10. Each installed processor needs its own memory, and HPE splits DIMMs evenly over the processors. Add more in HPE\'s order if you like: iLO shows what you fitted.</p>'}`;
+      ${POP_HTML_H}${lab ? '' : '<h3>Minimum for this build</h3><p class="cap" style="font-size:13px">2 DIMMs: 1 per processor, in slot 10. Each installed processor needs its own memory, and HPE splits DIMMs evenly over the processors. Add more in HPE\'s order if you like: iLO shows what you fitted.</p>'}`;
   }
 });
 const matTxt = t => Object.entries(t.memLeft || {}).filter(([, n]) => n).map(([k, n]) => `${n} x ${DIMMK[k].label}`).join(', ') || 'nothing';

@@ -106,6 +106,8 @@ The two packs' `views-rdist.js` are complete examples. The rules object holds:
   a slot, `{ cpu: c }` for a processor, `{ gap: true }` for a small space), `board.slot(pos)` (`{ tone }`: 'blue',
   'black' or 'white'), `board.label(c, pos)` (the text under the slot), `board.note` (the population rule under the
   title) and `board.legend` (three texts for the ok, part and bad marks);
+- `population`: the vendor's population table (HTML), shown in the side panel in practice and in the exam, the same
+  one the pack's Memory view shows;
 - the parts: `parts` (key, part number, name, short name, capacity, organisation; the labs use 16, 32 and 64 GB) and
   `part(key)`; optional `excludedNote`;
 - the rules: `checkCpu(map, c)` and `checkServer(maps, cpus)` return the errors for one CPU and for the server (a map
