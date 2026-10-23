@@ -6,11 +6,11 @@
    fits any HPE-supported layout: 1, 2, 4, 6, 8, 12 or 16 DIMMs per processor, each count in its own slots, both
    processors the same. HPE's layouts build on each other, so they are one fill order: 10, 3, then 7, 14, then 5, 16,
    then 1, 12, then 2, 6, 11, 15, then 4, 8, 9, 13. Minimum: 1 DIMM per processor (slot 10), 2 in all. HPE user guide:
-   open the DIMM slot latches, align the notch with the key, press the DIMM down until the latches close. In the build
-   labs the DIMM box holds two HPE DIMM types for this server, 32 of each: 32 GB 2Rx8 RDIMMs (P43328-B21) and 128 GB 4Rx4
-   3DS RDIMMs (P43334-B21). The student may build with either, at any point, but not with both: HPE's QuickSpecs for the
-   DL380 Gen11, "Mixing of 3DS memory and non-3DS memory is not supported". In the RAM Distributor labs the box holds
-   what the student ordered, any of the nine HPE DIMMs (model.js). ---- */
+   open the DIMM slot latches, align the notch with the key, press the DIMM down until the latches close. In every
+   lab with memory the DIMM box holds three HPE DIMM types for this server, 32 of each (model.js: MEMKIT_H): 16 GB 1Rx8
+   (P43322-B21), 32 GB 2Rx8 (P43328-B21) and 64 GB 2Rx4 (P43331-B21). The student builds with one of them: the 64 GB is
+   x4 and the others x8, and HPE does not mix x4 with x8; the 32 GB with the 16 GB is a mix HPE allows only with all 16
+   slots of a processor filled. The RAM Distributor plans with the same three on its own board. ---- */
 const FILL = [10, 3, 7, 14, 5, 16, 1, 12, 2, 6, 11, 15, 4, 8, 9, 13];
 const OKN = [1, 2, 4, 6, 8, 12, 16];
 const layoutOf = n => FILL.slice(0, n).sort((a, b) => a - b);
@@ -227,7 +227,7 @@ Sim.registerView({
     ['Channels and white slots', 'Each processor has 8 channels of two slots (1-2, 3-4 ... 15-16). With one DIMM per channel, use the white slots only: the first of each channel, the one farther from the processor.'],
     ['Minimum: 2 DIMMs', 'One per processor, in slot 10. Each installed processor needs its own memory, and HPE splits the DIMMs evenly over the processors.'],
     ['Balance', 'Give both processors the same number of DIMMs, in the same slots. Fewer than 8 per processor leaves channels empty: supported, but 8 per processor (one in every channel) gives the best memory bandwidth.'],
-    ['One DIMM type', 'Best practice: one part number throughout, the same on both processors. HPE does not support mixing 3DS RDIMMs (such as 128 GB 4Rx4) with standard RDIMMs, even though they fit the same slot.'],
+    ['One DIMM type', 'Best practice: one part number throughout, the same on both processors. HPE does not mix x4 DIMMs (the 64 GB 2Rx4) with x8 DIMMs (the 16 GB 1Rx8 and 32 GB 2Rx8), even though they fit the same slot.'],
     ['Mixing two types', 'Only with all 16 slots of a processor filled: one type in every white slot, one in every black, the higher rank in white. Allowed: dual rank (white) with single rank (black) of the same width and DRAM density, for example 32 GB 2Rx8 with 16 GB 1Rx8. Never x4 with x8, never 3DS with standard.'],
     ['Speed', 'DDR5-4800 RDIMMs run at 4800 MT/s with one DIMM per channel, 4400 MT/s with two (12 or 16 per processor).'],
     ['Installing a DIMM', 'Open both latches of the slot, line the notch up with the key, press the DIMM down evenly until both latches close.'],
@@ -249,9 +249,8 @@ Sim.registerView({
       const btn = !un ? (k === ks[0] ? button('Take them out', 'memUnpack') : '') : !now && left ? button('Fit this type', 'memPick', k) : '';
       return `<div class="item" style="padding:9px 10px;margin-top:8px;border:${wrong ? '2px solid var(--red)' : now ? '2px solid var(--touch)' : '1px solid var(--line)'};border-radius:8px"><span>${d.name}<small style="font-family:var(--mono)">${d.pid}</small><small>${d.label}</small><small>${[box[k] ? `${box[k]} in their antistatic packaging` : '', un || left ? `${left} on the mat` : '', used ? `${used} in the server` : ''].filter(Boolean).join(', ')}</small>${st}</span><span style="flex:none;white-space:nowrap">${btn}</span></div>`;
     };
-    const head = !ks.length ? 'No DIMMs yet: place the order in the RAM Distributor.' : lab ? (!un ? 'Your order, in its antistatic packaging. Take the DIMMs out, then fit them in the slots of your plan.' : `Next DIMM you fit: <b>${cur.short}</b>.`)
-      : !un ? `Two HPE DIMM types for this server, ${MEMKIT} of each, in their antistatic packaging. Use either one, but only one type in the whole server.`
-      : `Use either type, but only one in the whole server: HPE does not support mixing 3DS and non-3DS memory. Next DIMM you fit: <b>${cur.short}</b>.`;
+    const head = !ks.length ? 'No DIMMs left in the kit.' : !un ? `Three HPE DIMM types for this server, ${MEMKIT} of each, in their antistatic packaging: 16 GB, 32 GB and 64 GB. Use one type in the whole server.`
+      : `Use one type in the whole server: the 64 GB 2Rx4 is x4, the others x8, and HPE does not mix x4 with x8. Next DIMM you fit: <b>${cur.short}</b>.`;
     return `<h2>DIMM kit</h2><p class="cap" style="font-size:12.5px;margin:0">${head}</p>${mx ? `<p class="cap" style="font-size:12.5px;margin:6px 0 0;color:var(--red)"><b>Unsupported mix in the server.</b> The Memory view marks the DIMMs in red.</p>` : ''}${ks.map(card).join('')}
       <h3>Population (HPE, 4th Gen Xeon, 16 slots per processor)</h3><table class="dec"><tr><td>1</td><td>10</td></tr><tr><td>2</td><td>3, 10</td></tr><tr><td>4</td><td>3, 7, 10, 14</td></tr><tr><td>6</td><td>3, 5, 7, 10, 14, 16</td></tr><tr><td>8</td><td>1, 3, 5, 7, 10, 12, 14, 16</td></tr><tr><td>12</td><td>1, 2, 3, 5, 6, 7, 10, 11, 12, 14, 15, 16</td></tr><tr><td>16</td><td>1 to 16</td></tr></table><p class="cap" style="margin-top:6px">DIMMs per processor, then the slots; both processors the same. Other counts are not supported. Source: HPE server memory population rules for Gen11 (hpe.com/docs/server-memory).</p>${lab ? '' : '<h3>Minimum for this build</h3><p class="cap" style="font-size:13px">2 DIMMs: 1 per processor, in slot 10. Each installed processor needs its own memory, and HPE splits DIMMs evenly over the processors. Add more in HPE\'s order if you like: iLO shows what you fitted.</p>'}`;
   }
@@ -261,10 +260,10 @@ const locked = () => T.rd && T.rd.submitted ? say('info', 'The exam is submitted
 Sim.on('memUnpack', () => {
   if (locked()) return;
   if (!T.esd) return bad('Put on the ESD wrist strap first (Top view).');
-  if (!boxed(T)) return say('info', T.rd ? 'Nothing in the packaging: place the order in the RAM Distributor first.' : 'The DIMMs are already out of their packaging.');
+  if (!boxed(T)) return say('info', 'The DIMMs are already out of their packaging.');
   T.flags.memUnpacked = true; Object.entries(T.memBox).forEach(([k, n]) => { T.memLeft[k] = (T.memLeft[k] || 0) + n; }); T.memBox = {};
   if (!T.memLeft[T.memPick]) T.memPick = Object.keys(DIMMK).find(k => T.memLeft[k]) || T.memPick;
-  say('ok', `DIMMs out of their antistatic packaging, held by their edges; do not touch the gold contacts. On the mat: ${matTxt(T)}.${T.rd ? ' Fit them in the slots of your plan.' : ' Choose either type (the DIMM kit, right), but use only one in the server.'}`);
+  say('ok', `DIMMs out of their antistatic packaging, held by their edges; do not touch the gold contacts. On the mat: ${matTxt(T)}. Choose one type (the DIMM kit, right) and use only that one in the server.`);
 });
 Sim.on('memPick', k => {
   if (locked()) return;

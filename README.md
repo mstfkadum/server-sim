@@ -4,8 +4,8 @@ A hands-on server hardware simulator for engineers: the student picks a server m
 memory upgrade, NIC fit, drive, fan or power supply replacement, management setup) and works through it on photos of the real
 server, with guidance, mistake counting and a readiness check.
 
-Models: Cisco UCS C240 M4 LFF (thirteen labs: eight hands-on labs, the two RAM Distributor labs and three OS install labs; in the new install and the memory lab the student chooses one of two Cisco
-DIMM models, 16 GB RDIMM or 64 GB LRDIMM, and fits as many as they like in Cisco's order, minimum 2 DIMMs (A1 and E1),
+Models: Cisco UCS C240 M4 LFF (thirteen labs: eight hands-on labs, the two RAM Distributor labs and three OS install labs; in the new install and the memory lab the student chooses one of three Cisco
+DIMM models, 16 GB RDIMM, 32 GB RDIMM or 64 GB LRDIMM, and fits as many as they like in Cisco's order, minimum 2 DIMMs (A1 and E1),
 checked on a population map and read back in Cisco IMC, Chassis, Inventory, Memory; the cabling follows a cable schedule
 with exact ports: VIC PORT 1 and PORT 2 to SW01 and SW02 port 23, MGMT to MGT01 port 12, PSU 1 and PSU 2 to PDU A and
 PDU B outlet 7, and a cable in any other port is flagged, left without a link and must be moved) and HPE ProLiant DL380 Gen11 SFF (seven labs; HPE Lab 1 is the new build: find the
@@ -14,8 +14,8 @@ left rack ear of each one against the work order; all three slide out, and exten
 from the rack, processor 2 (the same hands-on flow as the replacement lab, for a new processor and a new heatsink: the
 blank and the socket cover off, the film off the pre-applied thermal pad, triangle to triangle, the processor clicked into
 the carrier, the module lowered, the wires clipped, the T-30 screws tightened in a cross order), as much memory as the student wants in any layout HPE supports (minimum 2 DIMMs, one per
-processor in slot 10; the DIMM box holds two HPE types, 32 GB RDIMMs and 128 GB 3DS RDIMMs: either one, never both,
-because HPE does not support mixing 3DS and non-3DS memory), as many front SSDs as the student wants (minimum 4, enough for a RAID 6 or RAID 10 data volume),
+processor in slot 10; the DIMM box holds three HPE types, 16 GB 1Rx8, 32 GB 2Rx8 and 64 GB 2Rx4 RDIMMs: one type in the server,
+because HPE does not mix x4 with x8 DIMMs), as many front SSDs as the student wants (minimum 4, enough for a RAID 6 or RAID 10 data volume),
 cabling at the rear of the rack to the exact ports of a cable schedule (iLO to MGT01 port 14, OCP 15 ports 1 and 2 to
 SW01 and SW02 port 24, PS1 and PS2 to PDU A and PDU B outlet 6), labelled and dressed, then the first iLO setup at the
 rack ( a monitor and keyboard at the rear,
@@ -35,32 +35,38 @@ see `docs/ADDING_A_MODEL.md`.
 
 ## RAM Distributor
 
-A memory planning tool and test for both servers, from the vendors' own population rules. Three ways to use it:
+A memory planning board and test for both servers, from the vendors' own population rules, with three DIMM sizes per
+server: 16, 32 and 64 GB (Cisco: 16 GB and 32 GB RDIMM, 64 GB LRDIMM; HPE: 16 GB 1Rx8, 32 GB 2Rx8, 64 GB 2Rx4 RDIMM).
+The page is one board: a Target GB box with **Distribute**, the choice of one or two processors, **Clear Board**,
+**Random Exam** and **Verify Distribution**, quick capacities (a star marks one where no layout fills every channel
+equally), then the population map of both processors. The student picks a DIMM size and clicks the slots to place it
+by hand (a click on a fitted slot with the same size takes it out). Distribute fills the board with the best layout
+for the target; Verify Distribution grades what is on the board. Three ways to use it:
 
-- **Planner** (the RAM Distributor in the left menu of any lab): type a capacity, choose one or two processors, and it
-  lists every supported layout for that capacity, best first, with the slot map, the DIMM part numbers, the speed,
-  the bandwidth and the reason for the ranking. Nothing is graded.
-- **Practice** (Cisco Lab 9, HPE Lab 3): a random work order (capacity and processors). Order the DIMMs, fit them in the
-  Memory view, run the memory check. The planner is open, so the best layout can be looked up.
+- **Planner** (the RAM Distributor in the left menu of any lab): any target, Distribute and Verify; Random Exam draws a
+  work order on the board, with Distribute and the marks off until it is verified. Nothing is recorded.
+- **Practice** (Cisco Lab 9, HPE Lab 3): a random work order (capacity and processors). Place the DIMMs, then verify.
+  Distribute is open, so the best layout can be looked up.
 - **Exam** (Cisco Lab 10, HPE Lab 4): a random work order from a set of tricky cases (a capacity no single DIMM size
-  fills, a capacity that cannot be met exactly, one processor only, a DIMM the chassis does not support). Guidance, the
-  planner and the memory hints are off until the student submits. The layouts are shown after submitting.
+  fills, a capacity that cannot be met exactly, a count the vendor does not support, one processor only). Guidance,
+  Distribute and the marks on the board are off until the student verifies, which submits the layout. The best layout
+  is shown after.
 
 Best means, in this order: at least the capacity ordered and no more than the least a supported layout gives; then the
 fastest (memory bandwidth within 5 % of the best); then the fewest DIMMs. Exam grading: an unsupported layout or less
 capacity than ordered fails (score 0). A supported layout passes with points off: 20 if a faster layout was possible,
-10 for more capacity than needed, 10 for more DIMMs than needed, and 10 per handling mistake. Pass mark 70.
+10 for more capacity than needed, 10 for more DIMMs than needed. Pass mark 70.
 
 The rules come from the vendors' documents and are shown on the page with their sources:
 
-- Cisco: the UCS C240 M4 spec sheet (six DDR4-2400 DIMMs, 8 to 64 GB RDIMM and LRDIMM; 1 to 12 per CPU in Cisco's
+- Cisco: the UCS C240 M4 spec sheet (DDR4-2400: 16 GB and 32 GB RDIMM, 64 GB LRDIMM; 1 to 12 per CPU in Cisco's
   order; both CPUs identical; no RDIMM with LRDIMM; speeds for a 2400 MHz Xeon E5-2680 v4).
 - HPE: the white paper a50007437enw (memory population rules for Gen11 servers with 4th Gen Xeon) and the DL380 Gen11
-  QuickSpecs (nine DDR5-4800 RDIMMs, 16 to 256 GB; 1, 2, 4, 6, 8, 12 or 16 per processor in fixed slots; no 3DS with
-  standard RDIMMs, no x4 with x8, no mixed DRAM densities; two types only with all 16 slots filled; the 256 GB DIMMs
-  not in a 24 SFF chassis; speeds for a Xeon Gold 6430).
+  QuickSpecs (DDR5-4800 RDIMMs: 16 GB 1Rx8, 32 GB 2Rx8, 64 GB 2Rx4; 1, 2, 4, 6, 8, 12 or 16 per processor in fixed
+  slots; no x4 with x8; two types only with all 16 slots filled, dual rank white and single rank black; speeds for a
+  Xeon Gold 6430).
 
-Limits: the check is the lab's memory summary, not a full power-on with memory training; one processor model per
+Limits: the check is the board's memory summary, not a full power-on with memory training; one processor model per
 server; bandwidth is a model (channels used and their interleaving), not a benchmark. The trainer does not replace the
 vendors' own configuration tools for a real order.
 

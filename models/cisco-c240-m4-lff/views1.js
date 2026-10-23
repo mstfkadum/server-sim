@@ -810,8 +810,8 @@ Sim.every(() => {   // redraw while a cleaning solution soaks
 
 /* ---- Memory: conceptual top view of the C240 M4 board, laid out like the cover label "CPU and DIMM Numbering"
    (front of the server at the bottom, CPU 2 at the left), a side view of the DIMM in hand like training slide 17, and a
-   map of the layout against Cisco's rules (model.js: memCheck). The build and memory labs offer two Cisco models (16 GB
-   RDIMM, 64 GB LRDIMM); the RAM Distributor labs offer whatever the student ordered, any of Cisco's six. ---- */
+   map of the layout against Cisco's rules (model.js: memCheck). The build and memory labs offer three Cisco models (16 GB
+   and 32 GB RDIMM, 64 GB LRDIMM); the RAM Distributor plans with the same three on its own board. ---- */
 // the exam: no marks, no next socket, no verdicts in the Memory view (the RAM Distributor grades at the end)
 const quiet = t => !!(t.rd && t.rd.exam);
 const locked = () => T.rd && T.rd.submitted ? say('info', 'The exam is submitted: the memory layout is locked.') || true : false;
@@ -881,7 +881,7 @@ function memBoard(t) {
 function dimmSide(t) {
   const id = t.sel.dimm, X = 14, Y = 352;
   let s = `<rect x="${X}" y="${Y}" width="872" height="292" rx="8" fill="#16293A" stroke="#2E5571"/>`;
-  if (!id) return s + `<text x="28" y="${Y + 24}" class="st">DIMM in hand</text><text x="450" y="${Y + 132}" text-anchor="middle" class="ss">${t.rd ? 'Nothing in hand. Pick up a DIMM of your order from the tray: its label and parts appear here.' : 'Nothing in hand. Pick up one of the two Cisco models from the tray: its label and parts appear here.'}</text><text x="450" y="${Y + 152}" text-anchor="middle" class="ss">${t.rd ? 'RDIMM (registered) or LRDIMM (load-reduced): never both in one server.' : '16 GB RDIMM (registered) or 64 GB LRDIMM (load-reduced): choose one model for the whole server.'}</text>`;
+  if (!id) return s + `<text x="28" y="${Y + 24}" class="st">DIMM in hand</text><text x="450" y="${Y + 132}" text-anchor="middle" class="ss">Nothing in hand. Pick up one of the three Cisco models from the tray: its label and parts appear here.</text><text x="450" y="${Y + 152}" text-anchor="middle" class="ss">16 GB or 32 GB RDIMM (registered), or 64 GB LRDIMM (load-reduced): choose one model for the whole server.</text>`;
   const m = byId('dimms', id), lr = m.type === 'LRDIMM';
   const dx = X + 16, dy = Y + 44, w = 560, h = 108;
   s += `<text x="28" y="${Y + 24}" class="st">DIMM in hand: ${esc(m.name)}</text><text x="872" y="${Y + 24}" text-anchor="end" class="ss">Front face; server DIMMs carry chips on both sides</text>`;
@@ -971,7 +971,7 @@ Sim.registerView({
     const shown = CATALOG.dimms.filter(d => (kit[d.id] || 0) > 0 || t.sel.dimm === d.id || Object.values(t.dimms).some(x => x.id === d.id));
     const card = d => { const now = t.sel.dimm === d.id, used = Object.values(t.dimms).filter(x => x.id === d.id).length;
       return `<div class="item" style="padding:9px 10px;margin-top:8px;border:${now ? '2px solid var(--touch)' : '1px solid var(--line)'};border-radius:8px"><span>${esc(d.name)}<small style="font-family:var(--mono)">${esc(d.label)}</small><small>${esc(d.pid)}, ${d.ranks} ranks</small><small>${kit[d.id] || 0} in the box${used ? `, ${used} in the server` : ''}</small>${now ? '<span class="pill on" style="margin-top:5px">&#10003; In your hand</span>' : ''}</span><span style="flex:none;white-space:nowrap">${now ? button('Put it back', 'memDrop') : button('Pick up', 'memPick', d.id)}</span></div>`; };
-    return `<h2>Pick a DIMM model</h2><p class="cap" style="font-size:12.5px;margin:0">${hand ? `In your hand: <b>${esc(hand.short)}</b> (${esc(hand.label)}, ${esc(hand.pid)}).` : t.rd ? (shown.length ? 'Nothing in your hand. Your order, in the box: fit it in Cisco\'s order.' : 'No DIMMs yet: place the order in the RAM Distributor.') : 'Nothing in your hand. Two Cisco models for this server: choose one for the whole server, RDIMMs and LRDIMMs must not be mixed.'}</p>` + shown.map(card).join('') +
+    return `<h2>Pick a DIMM model</h2><p class="cap" style="font-size:12.5px;margin:0">${hand ? `In your hand: <b>${esc(hand.short)}</b> (${esc(hand.label)}, ${esc(hand.pid)}).` : 'Nothing in your hand. Three Cisco models for this server: choose one for the whole server, RDIMMs and LRDIMMs must not be mixed.'}</p>` + shown.map(card).join('') +
       `<h3>Cisco population order (per CPU)</h3><table class="dec"><tr><td>DIMMs per CPU</td><td>CPU 1</td><td>CPU 2</td></tr><tr><td>1</td><td>A1</td><td>E1</td></tr><tr><td>2</td><td>A1, B1</td><td>E1, F1</td></tr><tr><td>3</td><td>A1, B1, C1</td><td>E1, F1, G1</td></tr><tr><td><b>4</b></td><td><b>A1 to D1</b> (all blue)</td><td><b>E1 to H1</b></td></tr><tr><td>5 to 7</td><td>+ A2, B2, C2</td><td>+ E2, F2, G2</td></tr><tr><td><b>8</b></td><td><b>+ D2</b> (all blue and black)</td><td><b>+ H2</b></td></tr><tr><td>9 to 11</td><td>+ A3, B3, C3</td><td>+ E3, F3, G3</td></tr><tr><td><b>12</b></td><td><b>+ D3</b> (all)</td><td><b>+ H3</b></td></tr></table><p class="cap" style="margin-top:6px">Any count from 1 to 12 per CPU is supported in this order, both CPUs the same, one model type. Bold: every channel equal, the best bandwidth. Source: Cisco UCS C240 M4 installation guide and spec sheet.</p>${t.rd ? '' : '<h3>Minimum for this lab</h3><p class="cap" style="font-size:13px">2 DIMMs: one per CPU, in A1 and E1. Each installed CPU needs its own memory, and Cisco wants both CPUs populated identically. Add more in Cisco\'s order if you like: Cisco IMC shows what you fitted.</p>'}`;
   }
 });

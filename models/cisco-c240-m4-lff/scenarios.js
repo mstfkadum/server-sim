@@ -90,14 +90,14 @@ const cpuSteps = i => { const n = i + 1, P = k => t => cpuProg(t, i) >= k, cue =
   { view: 'cpu', text: `CPU ${n}: clip the levers down, lock-icon lever first`, done: P(6), cue },
   { view: 'cpu', text: i === 0 ? 'CPU 1: clean the reused heatsink base and apply 2 cc of grease to the CPU' : 'CPU 2: peel the plastic sheet off the new heatsink\'s thermal pad', hint: i === 0 ? 'Cleaning solution, soak at least 15 seconds, wipe with the soft cloth. Then 2 cc of grease on the CPU.' : 'A new heatsink brings its own pad: add no grease.', done: P(7), cue },
   { view: 'cpu', text: `CPU ${n}: fit the heatsink and tighten its four screws evenly`, hint: 'No. 2 Phillips screwdriver. Alternate between the screws.', done: P(8), cue }]; };
-// the memory: one of the two Cisco models, in Cisco's order, both CPUs identical, at least A1 and E1
+// the memory: one of the three Cisco models, in Cisco's order, both CPUs identical, at least A1 and E1
 const hasDimm = (t, s, id = 'r16') => !!(t.dimms[s] && t.dimms[s].id === id);
 // the model the build uses: the one most of the fitted DIMMs are, else the one in hand, else the 16 GB RDIMM
 function memModel(t) {
   const ids = Object.keys(t.dimms).filter(s => !t.dimms[s].fault);
   if (!ids.length) return t.sel.dimm || 'r16';
-  const n = id => ids.filter(s => t.dimms[s].id === id).length;
-  return n('l64') > n('r16') ? 'l64' : 'r16';
+  const n = {}; ids.forEach(s => { n[t.dimms[s].id] = (n[t.dimms[s].id] || 0) + 1; });
+  return Object.keys(n).sort((a, b) => n[b] - n[a])[0];
 }
 // one socket: fetch the right model, open the levers, press it in (or take out a wrong one)
 function sockCue(t, slot, id) {
@@ -118,7 +118,7 @@ function memCueC(t, c, goal) {
   return add ? sockCue(t, add, id) : null;
 }
 const memSteps = () => [
-  { view: 'mem', text: 'Pick up both DIMM models and read their labels: registered (R) or load-reduced (L)?', hint: '16GB 2Rx4 PC4-2400T-RA1: RDIMM. 64GB 4Rx4 PC4-2400T-LD1: LRDIMM. Then choose one model for the whole server.',
+  { view: 'mem', text: 'Pick up the three DIMM models and read their labels: registered (R) or load-reduced (L)?', hint: '16GB 2Rx4 and 32GB 2Rx4 PC4-2400T-RA1: RDIMMs. 64GB 4Rx4 PC4-2400T-LD1: LRDIMM. Then choose one model for the whole server.',
     done: t => CATALOG.dimms.filter(d => t.memKit[d.id]).every(d => t.dimmSeen[d.id]), cue: t => { const d = CATALOG.dimms.find(x => t.memKit[x.id] && !t.dimmSeen[x.id]); return C('memPick', d.id, `Pick up the ${d.name} and read its label below the board.`); } },
   { view: 'mem', text: 'CPU 1: one DIMM model, in Cisco\'s order, at least A1', hint: 'Any count from 1 to 12 per CPU: blue #1 in A, B, C, D first, then black #2, then white #3. The minimum is one, in blue socket A1. The map below the board checks every socket.',
     done: t => cpuDimms(t, 0).length > 0 && !cpuErr(t, 0) && !mixErr(t), cue: t => memCueC(t, 0) },
@@ -253,7 +253,7 @@ const vicCables = { view: 'cable', text: 'Connect VIC PORT 1 to SW01 port 23 and
 
 Sim.registerScenario({
   id: 'install', title: 'New server install', start: 'bench', setup: () => { const t = fresh(); OSI.init(t, 'ubuntu', false); return t; },
-  intro: 'Build the server on the bench, rack it, cable it and check it. For the memory you choose: one of two Cisco models (16 GB RDIMM or 64 GB LRDIMM, never both), as many as you like in Cisco\'s order, both CPUs the same. Minimum: 2 DIMMs, A1 and E1, because each CPU needs its own memory and Cisco wants both CPUs populated identically. Cable it to the exact ports in the work order: PSU 1 to PDU A outlet 7, PSU 2 to PDU B outlet 7, VIC PORT 1 to SW01 port 23, VIC PORT 2 to SW02 port 23, MGMT to MGT01 port 12. At the end, Cisco IMC shows the memory you installed. The step bar above the picture always tells you the next action, and the amber ring shows where to click. Finally install Ubuntu Server 24.04 on the drive in HDD 01 through Cisco IMC: launch the KVM console, map the ISO from your laptop with Virtual Media, boot it once from the virtual DVD (F6 at POST), install, check the build from the installed system, and record the handover.',
+  intro: 'Build the server on the bench, rack it, cable it and check it. For the memory you choose: one of three Cisco models (16 GB RDIMM, 32 GB RDIMM or 64 GB LRDIMM: never an RDIMM with the LRDIMM), as many as you like in Cisco\'s order, both CPUs the same. Minimum: 2 DIMMs, A1 and E1, because each CPU needs its own memory and Cisco wants both CPUs populated identically. Cable it to the exact ports in the work order: PSU 1 to PDU A outlet 7, PSU 2 to PDU B outlet 7, VIC PORT 1 to SW01 port 23, VIC PORT 2 to SW02 port 23, MGMT to MGT01 port 12. At the end, Cisco IMC shows the memory you installed. The step bar above the picture always tells you the next action, and the amber ring shows where to click. Finally install Ubuntu Server 24.04 on the drive in HDD 01 through Cisco IMC: launch the KVM console, map the ISO from your laptop with Virtual Media, boot it once from the virtual DVD (F6 at POST), install, check the build from the installed system, and record the handover.',
   steps: [
     { view: 'bench', text: 'Put on the ESD wrist strap', done: t => t.esd || t.rack.pos !== 'bench', cue: () => C('esd', '', 'Put on the ESD wrist strap: click it below the chassis.') },
     { view: 'bench', text: 'Unlock the top cover and lift it off', hint: 'Unlock with a quarter turn anticlockwise, lift the latch by its green finger grip, then lift the cover straight up.', done: t => t.cover === 'open' || t.cpu[0].st !== 'dust', cue: coverCue },
@@ -317,9 +317,9 @@ Sim.registerScenario({
 });
 Sim.registerScenario({
   id: 'mem8', title: 'Memory: your choice of DIMMs, the Cisco way, then check Cisco IMC', start: 'mem',
-  intro: 'Both CPUs are installed and the server is open on the bench, with no memory. Choose one of the two Cisco models (16 GB RDIMM or 64 GB LRDIMM: never mix them) and fit as many as you like in Cisco\'s order: blue #1 sockets first, alternating CPUs, both CPUs the same. Minimum: 2 DIMMs, A1 and E1. Close the server, rack it, power it on and check in Cisco IMC that it reads the memory you installed.',
+  intro: 'Both CPUs are installed and the server is open on the bench, with no memory. Choose one of the three Cisco models (16 GB RDIMM, 32 GB RDIMM or 64 GB LRDIMM: never mix RDIMMs with LRDIMMs) and fit as many as you like in Cisco\'s order: blue #1 sockets first, alternating CPUs, both CPUs the same. Minimum: 2 DIMMs, A1 and E1. Close the server, rack it, power it on and check in Cisco IMC that it reads the memory you installed.',
   setup() {
-    const t = buildFull(); t.dimms = {}; t.memKit = { r16: 24, l64: 24 }; t.power = 'off'; t.post = null; t.con = newCon();
+    const t = buildFull(); t.dimms = {}; t.memKit = Object.fromEntries(MEMKIT_C.map(k => [k, 24])); t.power = 'off'; t.post = null; t.con = newCon();
     t.cables = { psu1: null, psu2: null, vic1: null, vic2: null, mgmt: null }; t.cablePort = { ...CWANT }; t.rack.pos = 'service';
     t.cover = 'open'; t.coverLock = false; t.baffle = false; t.esd = true; return t;
   },
@@ -436,12 +436,12 @@ Sim.registerScenario({
   ]
 });
 
-// the RAM Distributor labs (views-rdist.js, engine/memplan.js): a random work order from CIS_RULES.tasks
-const RD_FIT = 'Fit each CPU in Cisco\'s order: every blue #1 socket first, then black #2, then white #3, the DIMM with more ranks first in a channel; CPU 2 the same as CPU 1.';
-Sim.registerScenario(MemPlan.lab({ id: 'ramdist', title: 'RAM Distributor: plan the memory for a capacity (practice)', fitView: 'mem', fitHint: RD_FIT, setup: rdSetup, fitCue: rdFitCue,
-  practiceIntro: 'The server is open on the bench, the air baffle is out, your wrist strap is on, and there is no memory. The RAM Distributor lists every layout Cisco supports for the order, best first, and says why: order one, fit it in the Memory view, then run the memory check. Best means the least capacity that meets the order, then the fastest layout (memory bandwidth within 5 %), then the fewest DIMMs. Restart for a new work order; the exam is the next lab.' }));
-Sim.registerScenario(MemPlan.lab({ id: 'ramexam', title: 'RAM Distributor: exam (random work order, graded)', exam: true, fitView: 'mem', setup: rdSetup, fitCue: rdFitCue,
-  examIntro: 'Exam, graded: guidance, the planner and the memory hints are off until you submit. The server is open on the bench, the air baffle is out, your wrist strap is on, and there is no memory. In the RAM Distributor, order the DIMMs (Cisco part numbers and quantities), fit them in the Memory view, then submit for the memory check. An unsupported layout, or less capacity than ordered, fails. A supported layout passes, with points off: 20 if a faster layout was possible at the capacity needed, 10 for more capacity than needed, 10 for more DIMMs than needed, and 10 per handling mistake. Pass mark 70. Restart for a new work order.' }));
+// the RAM Distributor labs (views-rdist.js, engine/memplan.js): a random work order from CIS_RULES.tasks, planned on the board
+const RD_FIT = 'Choose a DIMM size, then click the sockets in Cisco\'s order: every blue #1 socket first, then black #2, then white #3, the bigger DIMMs first; CPU 2 the same as CPU 1. Distribute shows the best layout.';
+Sim.registerScenario(MemPlan.lab({ id: 'ramdist', title: 'RAM Distributor: plan the memory for a capacity (practice)', hint: RD_FIT, setup: rdSetup,
+  practiceIntro: 'Plan the memory for the work order on the RAM Distributor board: the three Cisco DIMMs (16 GB and 32 GB RDIMM, 64 GB LRDIMM) go in the sockets of CPU 1 (A to D) and CPU 2 (E to H). Place them by hand, or press Distribute for the best layout, then Verify Distribution. Best means the least capacity that meets the order, then the fastest layout (memory bandwidth within 5 %), then the fewest DIMMs. Restart for a new work order; the exam is the next lab.' }));
+Sim.registerScenario(MemPlan.lab({ id: 'ramexam', title: 'RAM Distributor: exam (random work order, graded)', exam: true, setup: rdSetup,
+  examIntro: 'Exam, graded: guidance, Distribute and the marks on the board are off until you verify. Place the three Cisco DIMM sizes (16 GB and 32 GB RDIMM, 64 GB LRDIMM) on the board for the work order, then Verify Distribution to submit. An unsupported layout, or less capacity than ordered, fails. A supported layout passes, with points off: 20 if a faster layout was possible at the capacity needed, 10 for more capacity than needed, 10 for more DIMMs than needed. Pass mark 70. Restart for a new work order.' }));
 
 /* ---- operating system installs over the KVM console's virtual media (views-os.js, engine/os-*.js): a reinstall of
    the server, one lab per operating system ---- */

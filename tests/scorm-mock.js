@@ -119,8 +119,8 @@ const BASE = `http://127.0.0.1:${server.address().port}/`;
     ok(d['cmi.core.lesson_status'] === 'passed' && d['cmi.core.score.raw'] === '100', `exam, best layout: ${d['cmi.core.lesson_status']}, score ${d['cmi.core.score.raw']}`);
     await p.evaluate(() => { __data = {}; __calls = []; });
     f = await open('ramexam');
-    await f.evaluate(() => { const t = twin(), r = REG().mem; Sim.do('go', 'rdist'); const k = r.parts[0].key; t.mp.qty = { [k]: '3' }; Sim.do('mpOrder'); });
-    await f.evaluate(() => { const t = twin(), r = REG().mem, k = r.parts[0].key; for (let i = 0; i < 3; i++) t.dimms[r.slotName(0, [9, 2, 6][i])] = Sim.model.startsWith('hpe') ? k : { id: k }; r.deliver(t, {}); Sim.do('mpSubmit'); Sim.do('mpSubmit', 'yes'); });
+    // three of the smallest DIMM on processor 1 only: never enough, and processor 2 (if ordered) left empty
+    await f.evaluate(() => { const r = REG().mem; Sim.do('go', 'rdist'); Sim.do('mpPart', r.parts[0].key); r.fill.slice(0, 3).forEach(pos => Sim.do('mpSlot', `0:${pos}`)); Sim.do('mpVerify'); Sim.do('mpVerify', 'yes'); });
     await run(f); d = await data(); u = await ui(f);
     ok(d['cmi.core.lesson_status'] === 'failed' && d['cmi.core.score.raw'] === '0' && /unsupported memory layout/.test(u.now), `exam, unsupported layout: ${d['cmi.core.lesson_status']}, score ${d['cmi.core.score.raw']}: ${u.now}`);
   }
