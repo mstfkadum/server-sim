@@ -160,6 +160,8 @@ function riserSideSvg(t) {
     if (seated && r.grip.f && r.grip.r) g += `<g${hot('riserLift', '', 'Lift riser 2 straight up')}><rect x="${RX(80)}" y="${RY(76)}" width="${RX(262) - RX(80)}" height="${RY(8) - RY(76)}" rx="6" class="zone"/></g>`;
   } else if (holding) g += `<g${hot('riserMat', '', 'Lay riser 2 on the antistatic mat')}><rect x="${RX(0)}" y="${RY(88)}" width="${RX(272) - RX(0)}" height="${RY(0) - RY(88)}" rx="6" class="zone"/></g>`;
   g += `</g></g></g>`;
+  // the RISER2 socket's housing again, in front of the riser: the gold edge goes into it and is hidden once engaged
+  g += `<rect x="${RX(104)}" y="${RY(6)}" width="${RX(232) - RX(104)}" height="${RY(0) - RY(6)}" fill="#111417" stroke="#3A4046" pointer-events="none"/>`;
   if (holding) g += `<g${hot('riserAlign', '', 'Lower riser 2 onto the RISER2 socket, the two alignment pegs and the two channels')}><rect x="${RX(0)}" y="${RY(18)}" width="${RX(272) - RX(0)}" height="${RY(0) - RY(18) + 6}" rx="6" class="zone" style="stroke-dasharray:6 4"/></g>` +
     `<text x="${RX(136)}" y="${RY(20) - 4}" text-anchor="middle" class="ss" style="fill:#FFD27A">RISER2 socket, pegs and channels: click to lower the riser here</text>`;
   const st = r.loc === 'up' ? 'Held above the chassis, level, by both touch points' : r.up.f || r.up.r ? `Resting on the socket, not engaged at the ${r.up.f && r.up.r ? 'front and rear' : r.up.f ? 'front' : 'rear'}` : r.grip.f || r.grip.r ? `Gripped at the ${r.grip.f && r.grip.r ? 'front and rear' : r.grip.f ? 'front' : 'rear'} touch point` : 'Seated in the RISER2 socket';
@@ -309,6 +311,7 @@ function riserBenchSvg(t) {
     const [x0, y0] = bp(u, 0, d), [x1, y1] = bp(u, 9, d);
     g += `<rect x="${f1(x0 - 3.6)}" y="${f1(y1)}" width="7.2" height="${f1(y0 - y1)}" fill="#C9D0D6" stroke="#6E767D" stroke-width=".7"/><ellipse cx="${f1(x1)}" cy="${f1(y1)}" rx="3.6" ry="2.2" fill="#2F6FB0" stroke="#6E767D" stroke-width=".7"/>`; });
   g += bbox(90, 101, 0, 9, 9, 17, '#EDE6D3', '#F7F2E4', '#C9C1AA');
+  g += `<defs><clipPath id="vicseat"><rect x="-10" y="-200" width="190" height="193.8"/><rect x="160" y="-200" width="20" height="230"/></clipPath></defs>`;
   // slot connectors and the cards in them, far to near: slot 6, then 5, then 4
   ['6', '5', '4'].forEach(s => {
     const c = RSL[s], d = RD(s);
@@ -319,7 +322,10 @@ function riserBenchSvg(t) {
     if (!id) return;
     const st = r.seat[s] || { f: true, r: true }, offF = st.f ? 0 : 6, offR = st.r ? 0 : 6, k = -RB.s * (offR - offF) / 168;
     const a = rfxAge('card' + s), drop = a < 0.5 ? `<animateTransform attributeName="transform" type="translate" from="0 -30" to="0 0" dur="0.45s" begin="-${a.toFixed(2)}s" fill="freeze"/>` : '';
-    g += `<g>${drop}<g transform="${faceM(d, 102, 1.5 + offF, k)}">${vicBack()}</g></g>`;
+    // fully seated, the gold edge connector is inside the slot connector: only the board above it shows (the bracket
+    // stays whole, its tab goes down past the board edge)
+    const inSlot = cardSeated(r, s) ? ` clip-path="url(#vicseat)"` : '';
+    g += `<g>${drop}<g transform="${faceM(d, 102, 1.5 + offF, k)}"><g${inSlot}>${vicBack()}</g></g></g>`;
     if (!cardSeated(r, s)) [['f', 14], ['r', 150]].forEach(([e, x]) => {
       const off = e === 'f' ? offF : offR, [px, py] = bp(102 + x, 1.5 + 62 + off, d);
       g += `<g${hot('cardPush', `${s}:${e}`, `Push down on the ${e === 'f' ? 'far end' : 'bracket end'} of the card in slot ${s}`)}><circle cx="${f1(px)}" cy="${f1(py - 20)}" r="17" fill="#0E1A22" fill-opacity=".6" stroke="${st[e] ? '#45D07F' : '#FFB52E'}" stroke-width="2.5"/><path d="M${f1(px)} ${f1(py - 30)}v18m-7 -7l7 7l7 -7" fill="none" stroke="${st[e] ? '#45D07F' : '#FFB52E'}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>`;
@@ -363,7 +369,9 @@ function riserBenchSvg(t) {
     g += `<path d="M${f1(kx - 14)} ${f1(ky - 8)}L${f1(kx - 30)} ${f1(ky - 26)}" stroke="#FFB52E" stroke-width="1"/>` + chip(kx - 156, ky - 26, `Thumbscrew: ${r.screw}`, 'start');
   } else if (r.plate === 'open') {
     const q = SPL.open * Math.PI / 180, fl = [[0, 0], [86, 0], [86, 78], [0, 78]].map(([u, dd]) => bp(u, SPL.hv - (dd - SPL.hd) * Math.sin(q), SPL.hd + (dd - SPL.hd) * Math.cos(q)));
-    g += `<g${hot('riserPlate', '', 'Securing plate, swung open: lift its two hinge-tabs out of their slots')}><polygon points="${pts(fl)}" class="zone"/></g>`;
+    // hooked back on its tabs (refitting): a click swings it closed; opened on the way off: a click lifts it off
+    g += r.hooked ? `<g${hot('riserPlateShut', '', 'Securing plate, hooked on its hinge-tabs: swing it closed')}><polygon points="${pts(fl)}" class="zone"/></g>`
+      : `<g${hot('riserPlate', '', 'Securing plate, swung open: lift its two hinge-tabs out of their slots')}><polygon points="${pts(fl)}" class="zone"/></g>`;
   } else {
     g += `<g${hot('riserPlate', '', 'Securing plate: hook its two hinge-tabs into their slots on the riser')}><rect x="${SPO.x - 10}" y="${SPO.y - 34}" width="${SPO.w + 20}" height="${SPO.h + 58}" rx="8" class="zone"/></g>`;
   }
@@ -534,20 +542,20 @@ Sim.on('riserPlate', () => {
     return say('ok', 'Securing plate swung open on its two hinge-tabs: its folded edge, with the black pads inside, has turned up off the riser\'s outer edge. Now lift it off.');
   }
   if (r.plate === 'open') {
-    rfxMark('plate', 'open'); r.plate = 'off';
+    rfxMark('plate', 'open'); r.plate = 'off'; r.hooked = false;
     return say('ok', 'Securing plate lifted off: its two hinge-tabs came out of their slots. It lies on the mat.');
   }
   if (r.ret !== 'closed') return bad('Close the blue card-tab retainer first. The securing plate goes back on last.');
   const u = unseated(r); if (u.length) return bad(`The card in slot ${u[0]} is not fully seated. Push down on both ends first.`);
-  rfxMark('plate', 'off'); r.plate = 'open'; r.screw = 'loose';
-  say('ok', 'The securing plate\'s two hinge-tabs are hooked into their slots next to the top plate. Now swing the plate closed.');
+  rfxMark('plate', 'off'); r.plate = 'open'; r.screw = 'loose'; r.hooked = true;
+  say('ok', 'The securing plate\'s two hinge-tabs are hooked into their slots next to the top plate. Now swing the plate closed: click the plate, or the button below the picture.');
 });
 Sim.on('riserPlateShut', () => {
   if (!inside() || !benchOnly()) return; const r = T.riser;
   if (r.plate !== 'open') return;
   if (r.ret !== 'closed') return bad('Close the blue card-tab retainer first. The securing plate goes back on last.');
   const u = unseated(r); if (u.length) return bad(`The card in slot ${u[0]} is not fully seated. Push down on both ends first.`);
-  rfxMark('plate', 'open'); r.plate = 'on'; r.screw = 'loose';
+  rfxMark('plate', 'open'); r.plate = 'on'; r.screw = 'loose'; r.hooked = false;
   say('ok', 'Securing plate swung closed: its folded edge lies along the riser\'s outer edge and the thumbscrew sits over its post. Now tighten the thumbscrew.');
 });
 Sim.on('riserRet', () => {

@@ -97,7 +97,7 @@ function inside(core) {
   return true;
 }
 // riser 2: in the chassis ('in', with each end engaged or resting), held above it ('up'), or on the antistatic mat ('mat')
-function newRiser() { return { loc: 'in', grip: { f: false, r: false }, up: { f: 0, r: 0 }, screw: 'tight', plate: 'on', ret: 'closed', slots: { 4: null, 5: null, 6: null }, blank: { 4: true, 5: true, 6: true }, seat: { 4: null, 5: null, 6: null }, spare: 0 }; }
+function newRiser() { return { loc: 'in', grip: { f: false, r: false }, up: { f: 0, r: 0 }, screw: 'tight', plate: 'on', hooked: false, ret: 'closed', slots: { 4: null, 5: null, 6: null }, blank: { 4: true, 5: true, 6: true }, seat: { 4: null, 5: null, 6: null }, spare: 0 }; }
 const riserOut = t => t.riser.loc !== 'in';
 const riserSeated = t => t.riser.loc === 'in' && !t.riser.up.f && !t.riser.up.r;
 const cardSeated = (r, s) => !!(r.seat[s] && r.seat[s].f && r.seat[s].r);
