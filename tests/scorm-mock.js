@@ -38,6 +38,7 @@ const server = http.createServer((req, res) => {
 const BASE = `http://127.0.0.1:${server.address().port}/`;
 (async () => {
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1420, height: 1020 } });
+  await p.addInitScript(() => { try { localStorage.setItem('sbt.tour', 'seen'); } catch (e) { } });   // the first-visit tour stays closed (tests/tour.js covers it)
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   let fails = 0; const ok = (c, m) => { if (!c) fails++; console.log((c ? 'PASS ' : 'FAIL ') + m); };
   await p.goto(BASE + 'harness.html');

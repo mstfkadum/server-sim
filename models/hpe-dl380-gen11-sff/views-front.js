@@ -1,18 +1,18 @@
 /* ---- Front panel and drives: the trainer's photo of the front (FC frame, 2630 x 490), corrected for lens distortion
    and keystone so the bays are evenly spaced, with the sharper close-up pasted in for the right rack ear; every LED is
    drawn over it. Three drive boxes of eight SFF bays, Box 1 on the left, bays numbered 1 to 8 left to right (service
-   label). Each bay holds an HPE basic carrier: one long latch lever, hinged at its top, its bottom end the grip with the
-   dark red line; below the red line a finger space, then the Online/Activity LED (green, left) and the Fault/Locate LED
-   (amber or blue, right). To open: a finger in the space below the red line lifts the lever's bottom end out, about
-   halfway, then pulls the drive out by it. To fit a drive: blank out (keep it), slide the drive in with the latch open
+   label). Each bay holds an HPE basic carrier: one long latch lever, hinged at its top, its bottom end the release
+   button, a square with a dark red line; below it the Online/Activity LED (green, left) and the Fault/Locate LED
+   (amber or blue, right). To open: press the square: it clicks, the latch springs out about halfway, pivoting on its
+   top hinge; then pull the drive out by it. To fit a drive: blank out (keep it), slide the drive in with the latch open
    until it is fully seated, push the latch closed until it clicks, check the LEDs (the trainer's close-ups). ---- */
 const FC = { W: 2630, H: 490 };
 const LEDX = [224.9, 313.6, 401.8, 489.6, 577.5, 666.8, 756.1, 844.8, 955.9, 1043.1, 1129.3, 1215.9, 1300.7, 1386.6, 1472.1, 1557.4, 1668.4, 1756.1, 1844.2, 1930.6, 2018.0, 2102.7, 2187.3, 2273.8];
 const LEDY = [441.5, 439.7, 439.5, 438.0, 437.7, 437.9, 438.0, 438.2, 437.2, 437.2, 437.6, 437.8, 437.6, 437.5, 438.1, 437.0, 436.5, 434.7, 433.6, 433.6, 433.4, 433.2, 434.7, 435.2];
 const BAYL = LEDX.map(x => Math.round(x - 35));
-// one bay, relative to its left edge: the opening, the latch hinge (top), the finger space below the red line (fin), and
-// the latch lever: the handle, the neck, and its grip end with the red line, one rigid piece
-const BAY = { w: 88, y0: 22, y1: 460, hinge: 44, rel: [16, 84, 346, 430], fin: [24, 80, 402, 424] };
+// one bay, relative to its left edge: the opening, the latch hinge (top), the release button (rel: the square with the
+// red line at the latch's bottom end, x0 x1 y0 y1), and the latch lever: the handle, the neck, and that end, one rigid piece
+const BAY = { w: 88, y0: 22, y1: 460, hinge: 44, rel: [20, 84, 338, 406] };
 const HAND = [[8, 44], [84, 44], [87, 50], [87, 114], [74, 128], [74, 288], [88, 304], [88, 337], [80, 343], [80, 401], [24, 401], [24, 343], [10, 337], [10, 304], [22, 290], [22, 128], [8, 114], [5, 50]];
 const handPath = L => 'M' + HAND.map(([x, y]) => `${L + x} ${y}`).join('L') + 'Z';
 const FP = { power: [2507, 67.2], health: [2505.5, 103.7], nic: [2505.5, 138.2], uid: [2505.5, 175.1], svc: [2548, 23, 2601, 116], usb: [2554, 147, 2592, 210],
@@ -81,10 +81,15 @@ function bayArt(t, i, detail) {
   } else if (b.st === 'open') {
     // the drive slid in (or released): the latch stands open
     const ins = a < 0.65 && fx === 'ins', rel = a < 1 && fx === 'rel';
-    // lifted by a finger under the red line: the grip end comes out (in this view it rises), smoothly, to halfway
-    const anim = rel ? `<animateTransform attributeName="transform" type="scale" values="1 1;1 1;1.06 ${ANG}" keyTimes="0;.25;1" dur="0.7s" begin="-${a.toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0 0 1 1;.3 .1 .3 1"/>` : '';
+    // the release button pressed: a fingertip pushes the square with the red line in (it darkens), it clicks, the finger
+    // comes away and the latch springs out (in this view its bottom end rises) to halfway, past it a little and back
+    const anim = rel ? `<animateTransform attributeName="transform" type="scale" values="1 1;1 1;1.07 ${(ANG - 0.07).toFixed(2)};1.06 ${ANG}" keyTimes="0;.32;.72;1" dur="0.75s" begin="-${a.toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0 0 1 1;.15 .8 .3 1;.4 0 .6 1"/>` : '';
     let d = openLatch(L, i, anim);
-    if (rel && detail) { const yb = 401, yt = BAY.hinge + (yb - BAY.hinge) * ANG; d += `<g opacity="0"><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.75;1" dur="1s" begin="-${a.toFixed(2)}s" fill="freeze"/><g><animateTransform attributeName="transform" type="translate" values="0 26;0 0;0 0;0 ${f1(yt - yb)}" keyTimes="0;.21;.25;1" dur="0.7s" begin="-${a.toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0 0 1 1;0 0 1 1;.3 .1 .3 1"/>${fingertip(L + 52, yb + 2, 0.85)}</g></g>`; }
+    if (rel && detail) {
+      const R = BAY.rel, at = `dur="0.75s" begin="-${a.toFixed(2)}s" fill="freeze"`;
+      d += `<rect x="${L + 24}" y="${R[2] + 5}" width="56" height="58" rx="3" fill="#000" opacity="0" pointer-events="none"><animate attributeName="opacity" values="0;0;.45;.45;0;0" keyTimes="0;.18;.24;.32;.4;1" ${at}/></rect>`;
+      d += `<g opacity="0" pointer-events="none"><animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;.14;.34;.5;1" ${at}/><g><animateTransform attributeName="transform" type="translate" values="0 20;0 0;0 0;0 46;0 46" keyTimes="0;.2;.32;.5;1" ${at} calcMode="spline" keySplines=".3 0 .5 1;0 0 1 1;.4 0 .8 .6;0 0 1 1"/>${fingertip(L + 52, (R[2] + R[3]) / 2 - 8, 0.85)}</g></g>`;
+    }
     if (ins) {
       const cx = L + BAY.w / 2, cy = 240;
       d = `<g opacity="0"><animate attributeName="opacity" values="0;1;1" keyTimes="0;.4;1" dur="0.6s" begin="-${a.toFixed(2)}s" fill="freeze"/><g transform="translate(${cx} ${cy})"><g><animateTransform attributeName="transform" type="scale" values="1.32;1" dur="0.6s" begin="-${a.toFixed(2)}s" fill="freeze" calcMode="spline" keySplines=".2 .7 .3 1" keyTimes="0;1"/><g transform="translate(${-cx} ${-cy})">` +
@@ -137,7 +142,7 @@ function frontSvg(t) {
     const bb = t.bays[i], L = BAYL[i], nm = bayName(i);
     const lab = bb.st === 'blank' ? `${nm}: drive blank, pull it out` : bb.st === 'empty' ? `${nm}: empty bay` : bb.st === 'open' ? (bb.ins ? `${nm}: drive in, latch open: push the latch closed` : `${nm}: latch lifted: pull the drive out by it`) : `${nm}: ${CATALOG.ssd.short}${bb.health === 'fault' ? ', fault LED amber' : ''}`;
     g += `<g${hot('bay', i, lab)}><rect x="${L + 3}" y="${BAY.y0}" width="${BAY.w - 6}" height="${(bb.st === 'drive' ? BAY.rel[2] - 4 : BAY.y1) - BAY.y0}" rx="5" class="zone"/></g>`;
-    if (bb.st === 'drive') g += `<g${hot('bayRel', i, `${nm}: the finger space below the red line: lift the latch`)}><rect x="${L + BAY.rel[0]}" y="${BAY.rel[2]}" width="${BAY.rel[1] - BAY.rel[0]}" height="${BAY.rel[3] - BAY.rel[2]}" rx="5" class="zone"/></g>`;
+    if (bb.st === 'drive') g += `<g${hot('bayRel', i, `${nm}: the release button, the square with the red line: press it to open the latch`)}><rect x="${L + BAY.rel[0]}" y="${BAY.rel[2]}" width="${BAY.rel[1] - BAY.rel[0]}" height="${BAY.rel[3] - BAY.rel[2]}" rx="5" class="zone"/></g>`;
   }
   g += `</g>`;
   for (let i = k0 * 8; i < k0 * 8 + 8; i++) g += `<text x="${f1(VB.x + (BAYL[i] + BAY.w / 2 - a) * s)}" y="${f1(VB.y + hB + 16)}" text-anchor="middle" style="font:700 13px var(--font);fill:${i === sel ? '#7CF0A8' : '#EAF2F7'}">${(i % 8) + 1}</text>`;
@@ -147,7 +152,7 @@ function frontSvg(t) {
   // 4. how to fit a drive, under the side view
   const IX = VS.x, IY = VS.y + 190;
   g += `<rect x="${IX}" y="${IY}" width="268" height="${f1(VB.y + hB - IY)}" rx="8" fill="#16293A" stroke="#2E5571"/><text x="${IX + 12}" y="${IY + 22}" class="st" style="font-size:12.5px">Fitting a drive (HPE)</text>`;
-  ['1. Pull the blank out; keep it.', '2. Lift the new drive\'s latch: a finger', '    below the red line, halfway out.', '3. Slide it in until it is fully', '    seated, latch open.', '4. Push the latch closed: it clicks.', '5. Check the drive LEDs.'].forEach((s2, i) => { g += `<text x="${IX + 12}" y="${IY + 46 + i * 20}" class="ss" style="white-space:pre">${esc(s2)}</text>`; });
+  ['1. Pull the blank out; keep it.', '2. Open the new drive\'s latch: press', '    the square with the red line.', '3. Slide it in until it is fully', '    seated, latch open.', '4. Push the latch closed: it clicks.', '5. Check the drive LEDs.'].forEach((s2, i) => { g += `<text x="${IX + 12}" y="${IY + 46 + i * 20}" class="ss" style="white-space:pre">${esc(s2)}</text>`; });
   // 5. the pull tab, pulled out, over the enlarged box
   if (t.pullTab) g += pullTabArt(t);
   return frame('Front panel and drive bays', g, f1(VB.y + hB + 50));
@@ -185,17 +190,20 @@ function baySide(t, i, X, Y) {
   const hx = dX, hy = top + 6, open = b.st === 'open', ang = open ? 45 : 0, gy = hy + ht - 6;
   let la = '', fin = '';
   const finger = (op, rot) => `<g opacity="0">${op}<g transform="rotate(${rot} ${hx} ${hy})"><path d="M${hx - 11} ${gy + 30}V${gy + 8}a6 6 0 0 1 12 0V${gy + 30}z" fill="#D9A47E" stroke="#8A5A3C" stroke-width="1.2"/><path d="M${hx - 8.5} ${gy + 15}V${gy + 8}a3.5 3.5 0 0 1 7 0V${gy + 15}z" fill="#F1D2BC"/></g></g>`;
+  let press = '';
   if (open && fx === 'rel' && a < 1) {
-    la = `<animateTransform attributeName="transform" type="rotate" values="0 ${hx} ${hy};0 ${hx} ${hy};${ang} ${hx} ${hy}" keyTimes="0;.25;1" dur="0.7s" begin="-${a.toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0 0 1 1;.3 .1 .3 1"/>`;
-    fin = finger(`<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.75;1" dur="1s" begin="-${a.toFixed(2)}s" fill="freeze"/>`, 0);
+    // pressed from the front on the square with the red line: the finger pushes in, the lever springs out past 45 degrees and settles
+    const at = `dur="0.75s" begin="-${a.toFixed(2)}s" fill="freeze"`, py = gy - 19.5;
+    la = `<animateTransform attributeName="transform" type="rotate" values="0 ${hx} ${hy};0 ${hx} ${hy};${ang + 7} ${hx} ${hy};${ang} ${hx} ${hy}" keyTimes="0;.32;.72;1" ${at} calcMode="spline" keySplines="0 0 1 1;.15 .8 .3 1;.4 0 .6 1"/>`;
+    press = `<g opacity="0"><animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;.14;.34;.5;1" ${at}/><g><animateTransform attributeName="transform" type="translate" values="-14 0;0 0;0 0;-26 0;-26 0" keyTimes="0;.2;.32;.5;1" ${at} calcMode="spline" keySplines=".3 0 .5 1;0 0 1 1;.4 0 .8 .6;0 0 1 1"/><path d="M${hx - 42} ${py - 6}H${hx - 15}a6 6 0 0 1 0 12H${hx - 42}z" fill="#D9A47E" stroke="#8A5A3C" stroke-width="1.2"/><path d="M${hx - 22} ${py - 3.5}H${hx - 15}a3.5 3.5 0 0 1 0 7H${hx - 22}z" fill="#F1D2BC"/></g></g>`;
   }
   if (!open && fx === 'close' && a < 0.9) {
     la = `<animateTransform attributeName="transform" type="rotate" values="45 ${hx} ${hy};45 ${hx} ${hy};0 ${hx} ${hy}" keyTimes="0;.3;1" dur="0.55s" begin="-${a.toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0 0 1 1;.5 0 .8 .6"/>`;
     fin = finger(`<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.1;.65;1" dur="0.9s" begin="-${a.toFixed(2)}s" fill="freeze"/>`, 0);
   }
-  g += `<g transform="rotate(${la ? 0 : ang} ${hx} ${hy})">${la}<path d="M${hx - 1} ${hy - 4}h-7v${ht - 6}l7 4z" fill="#0F1113" stroke="#59616A" stroke-width="1.2"/><rect x="${hx - 8}" y="${gy - 22}" width="7" height="5" fill="#8A2A3A"/>${fin}</g><circle cx="${hx - 3}" cy="${hy}" r="2.6" fill="#B8C0C7"/>`;
+  g += `<g transform="rotate(${la ? 0 : ang} ${hx} ${hy})">${la}<path d="M${hx - 1} ${hy - 4}h-7v${ht - 6}l7 4z" fill="#0F1113" stroke="#59616A" stroke-width="1.2"/><rect x="${hx - 8}" y="${gy - 22}" width="7" height="5" fill="#8A2A3A"/>${fin}</g><circle cx="${hx - 3}" cy="${hy}" r="2.6" fill="#B8C0C7"/>${press}`;
   g += `</g></g>`;
-  const msg = b.st === 'drive' ? (b.health === 'fault' ? 'Fault LED amber: replace this drive' : 'Latch closed: the drive is locked in') : b.st === 'open' ? (b.ins ? 'Fully seated, latch open: push it closed' : 'Latch lifted halfway: pull the drive out') : '';
+  const msg = b.st === 'drive' ? (b.health === 'fault' ? 'Fault LED amber: replace this drive' : 'Latch closed: the drive is locked in') : b.st === 'open' ? (b.ins ? 'Fully seated, latch open: push it closed' : 'Latch sprung open halfway: pull the drive out') : '';
   g += `<text x="${X + 10}" y="${Y + 34}" class="ss" style="fill:${b.st === 'open' ? '#FFD27A' : b.health === 'fault' ? '#FF8A7A' : '#C5CCD3'}">${msg}</text>`;
   return g;
 }
@@ -256,7 +264,7 @@ Sim.registerView({
   keep: [
     ['Hot-plug drives', 'SAS and SATA drives in the front bays can be replaced with the server running. Check the drive LEDs first, and replace only the drive with the amber fault LED.'],
     ['Blanks keep the airflow', 'Never leave a bay empty while the server runs: fit a drive or keep its blank in. Keep the blanks you remove for later.'],
-    ['Basic carrier latch', 'The latch is one long lever, hinged at its top; its bottom end, with the dark red line, is the grip. Put a finger in the space below the red line and lift the lever out, about halfway, then pull the drive out by it.'],
+    ['Basic carrier latch', 'The latch is one long lever, hinged at its top; its bottom end, with the dark red line, is the release button. Press the square with the red line: it clicks and the lever springs out, about halfway; then pull the drive out by it.'],
     ['Installing a drive', 'Remove the blank. Lift the new drive\'s latch halfway open. Slide the drive into the bay until it is fully seated, then push the latch closed until it clicks. Check the LEDs.'],
     ['Drive LEDs', 'Online/Activity (left): solid green online, flashing green activity or rebuild, off not configured. Fault/Locate (right): solid amber failed, flashing amber predictive failure, solid blue being located.'],
     ['Front panel LEDs', 'Power: green on, flashing green powering on, amber standby, off no power. Health: green normal, flashing green iLO rebooting, flashing amber degraded, flashing red critical. All four flashing together: a power fault.'],
@@ -278,7 +286,7 @@ Sim.registerView({
       (t.flags.driveMin ? `<p class="cap" style="font-size:13px">Fitted: <b>${driveCount(t)}</b> of 24 bays. Minimum for this build: <b>${DMIN}</b>. The operating system lives on the NS204i-u boot device (two M.2 SSDs in RAID 1, at the rear), so the front drives are for data, and ${DMIN} drives are enough for any RAID level the MR416i-o offers for a data volume, RAID 6 and RAID 10 included. Fit more if you like: iLO's Storage page lists every drive you fitted.</p>` : '') +
       (hand && hand.kind === 'failed' ? `<p class="cap" style="font-size:13px;color:var(--red)">In your hand: the failed drive from ${esc(bayName(hand.from))}.</p>` : '') +
       (t.rma ? '<p class="cap" style="font-size:13px">Failed drive tagged and set aside for return.</p>' : '') +
-      `<h3>The basic carrier</h3><div style="display:flex;gap:10px;align-items:flex-start"><img class="photo" style="width:96px;flex:none" alt="Two drive bays of this server close up" src="${IMG.hpBayRef}"><ol class="rules" style="margin:0;padding-left:18px;font-size:12.5px"><li>Latch lever (the handle), hinged at the top</li><li>Its grip end, with the dark red line; the finger space is just below it</li><li>Online/Activity LED (left)</li><li>Fault/Locate LED (right)</li><li>Bay number, printed above the bay</li></ol></div>` +
+      `<h3>The basic carrier</h3><div style="display:flex;gap:10px;align-items:flex-start"><img class="photo" style="width:96px;flex:none" alt="Two drive bays of this server close up" src="${IMG.hpBayRef}"><ol class="rules" style="margin:0;padding-left:18px;font-size:12.5px"><li>Latch lever (the handle), hinged at the top</li><li>Its bottom end, the release button: the square with the dark red line. Press it to open the latch</li><li>Online/Activity LED (left)</li><li>Fault/Locate LED (right)</li><li>Bay number, printed above the bay</li></ol></div>` +
       `<h3>Drive LEDs</h3><table class="dec"><tr><td>Green, solid</td><td>Online, no activity</td></tr><tr><td>Green, flashing</td><td>Activity, or rebuilding</td></tr><tr><td>Amber, solid</td><td>Failed</td></tr><tr><td>Amber, flashing</td><td>Predictive failure</td></tr><tr><td>Blue, solid</td><td>Being located</td></tr><tr><td>Off</td><td>Not configured, or a spare</td></tr></table>`;
   }
 });
@@ -317,8 +325,8 @@ Sim.on('bayRel', i => {
   if (b.st !== 'drive') return;
   if (b.health !== 'fault' && isOn(T) && T.vol.members.includes(i)) return bad(`${bayName(i)} is a healthy drive in a running array (green LED). Find the drive with the amber fault LED.`);
   b.st = 'open'; b.ins = false; b.rel = true; bayFx(i, 'rel');
-  Sim.sound('clipOpen', 0.2);
-  say('ok', `Finger in the space below the red line of ${bayName(i)}: the latch lifted out about halfway, pivoting on its top hinge. Now pull the drive out by it.`);
+  Sim.sound('clip', 0.17); Sim.sound('clipOpen', 0.26);
+  say('ok', `Release button of ${bayName(i)} pressed, the square with the red line: click. The latch sprang out about halfway, pivoting on its top hinge. Now pull the drive out by it.`);
 });
 Sim.on('bay', i => {
   i = +i; const b = T.bays[i]; T.sel.bay = i; T.sel.box = boxOf(i);
@@ -347,5 +355,5 @@ Sim.on('bay', i => {
     return bad(`That drive was healthy. Put it back in ${bayName(i)}.`);
   }
   if (b.st === 'drive' && b.health === 'fault') T.flags.found = true;
-  if (b.st === 'drive') say('info', `${bayName(i)}: ${CATALOG.ssd.short} (${CATALOG.ssd.label}). ${b.health === 'fault' ? 'Fault/Locate LED amber: this is the failed drive. Put a finger in the space below its red line and lift the latch.' : isOn(T) ? 'Online LED green.' : 'Server off: LEDs off.'}`);
+  if (b.st === 'drive') say('info', `${bayName(i)}: ${CATALOG.ssd.short} (${CATALOG.ssd.label}). ${b.health === 'fault' ? 'Fault/Locate LED amber: this is the failed drive. Press the square with the red line, the release button, to open the latch.' : isOn(T) ? 'Online LED green.' : 'Server off: LEDs off.'}`);
 });

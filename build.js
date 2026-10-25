@@ -1,6 +1,6 @@
 // Server build trainer. © 2026 Mustafa Abdulkadhim, Information Technology. All rights reserved.
 // Build the single-file simulator:
-//   engine/head.html + engine/engine.js + engine/memplan.js + engine/os-*.js + engine/lms.js + every model pack (each wrapped in its own scope) + engine/boot.js
+//   engine/head.html + engine/engine.js + engine/memplan.js + engine/os-*.js + engine/lms.js + engine/tour.js + every model pack (each wrapped in its own scope) + engine/boot.js
 // Usage: node build.js [output.html]   (default: dist/index.html)
 // Extra model folders for testing can be listed in the BUILD_EXTRA_MODELS environment variable (comma-separated paths).
 const fs = require('fs'), path = require('path');
@@ -20,6 +20,6 @@ const pack = dir => {
 // the OS install over virtual media: the core, the console and shell, then one file per operating system
 const OS_FILES = ['engine/os-core.js', 'engine/os-shell.js', 'engine/os-ubuntu.js', 'engine/os-rocky.js', 'engine/os-esxi.js'];
 // engine/fonts.css (the embedded typefaces) goes where head.html has the /*@fonts*/ marker
-const html = rd('engine/head.html').replace('/*@fonts*/', () => rd('engine/fonts.css')) + rd('engine/engine.js') + rd('engine/memplan.js') + OS_FILES.map(rd).join('') + rd('engine/lms.js') + dirs.map(pack).join('') + rd('engine/boot.js') + '</script>\n</body>\n</html>\n';
+const html = rd('engine/head.html').replace('/*@fonts*/', () => rd('engine/fonts.css')) + rd('engine/engine.js') + rd('engine/memplan.js') + OS_FILES.map(rd).join('') + rd('engine/lms.js') + rd('engine/tour.js') + dirs.map(pack).join('') + rd('engine/boot.js') + '</script>\n</body>\n</html>\n';
 fs.writeFileSync(out, html);
 console.log(`built ${out}: ${dirs.length} model(s), ${(html.length / 1048576).toFixed(2)} MB`);

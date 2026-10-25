@@ -13,7 +13,9 @@ engine/memplan.js       the RAM Distributor: board, ranking and exam grading, dr
 engine/os-core.js       OS install over virtual media: ISO library, boot logic, handover check, lab steps
 engine/os-ubuntu.js     the Ubuntu Server installer; os-rocky.js the Rocky Linux installer; os-esxi.js ESXi and its DCUI
 engine/os-shell.js      the installed Linux system: console login and a shell that answers from the twin
-engine/boot.js          fills the menus and starts the first model (or ?model=...&scenario=...)
+engine/lms.js           the SCORM 1.2 link (score, completion, resume) inside a learning platform
+engine/tour.js          How to use: the first-page tour of the screen (engine parts only, nothing per model)
+engine/boot.js          fills the menus and starts the first model (or ?model=...&scenario=...), then the tour on a first visit
 models/index.json       which models are built, in dropdown order
 models/<id>/            one model pack: manifest.json plus its JavaScript files
 docs/template-model/    a minimal working pack to copy
@@ -212,5 +214,8 @@ With Node.js and Playwright installed (`npm i playwright`):
 - `node tests/os-install.js dist/index.html` runs the OS install mistakes (wrong image, wrong disk, a port without a
   link, the management network on the wrong adapter, wrong handover values) and checks the shells' answers against the
   twin.
+- `node tests/tour.js dist/index.html` checks the How to use tour: first visit, every card's spotlight and card on the
+  screen (desktop, phone, an exam, inside a learning platform), keys, Skip, reopening, and that it is not a lab action.
+  The other tests mark the tour as seen before they load the page.
 - `node tests/scorm-mock.js` builds the SCORM packages and runs them inside a mock learning platform: graded,
   practice, failed-then-passed and resumed runs.

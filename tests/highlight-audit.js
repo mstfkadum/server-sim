@@ -7,6 +7,7 @@ const [file, out, onlyM, onlyS] = process.argv.slice(2);
 fs.mkdirSync(out, { recursive: true });
 (async () => {
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1400, height: 1000 } });
+  await p.addInitScript(() => { try { localStorage.setItem('sbt.tour', 'seen'); } catch (e) { } });   // the first-visit tour stays closed (tests/tour.js covers it)
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto('file://' + path.resolve(file)); await p.waitForTimeout(500);
   const models = (onlyM ? onlyM.split(',') : await p.evaluate(() => Sim.modelOrder));

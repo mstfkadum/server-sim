@@ -119,6 +119,18 @@ host: GitHub Pages, Netlify, Cloudflare Pages, a university web server, or a lea
 Direct links: `index.html?model=cisco-c240-m4-lff&scenario=fan` or `index.html?model=hpe-dl380-gen11-sff&scenario=install`
 opens a model and scenario (`&guide=off` starts with guidance off).
 
+## How to use: the first-page tour
+
+On the first visit the page opens with a short tour: a welcome card with the four things a lab asks (pick the lab,
+read the step, click the part, finish every step), then one card per part of the screen with that part spotlighted:
+Server model and Lab (inside a learning platform, the course bar instead, with the package's pass mark and graded or
+practice rules), Guidance, Sound, Restart, progress and mistakes, work areas, the step, the workbench, the action
+buttons, the lab briefing, the steps, the reference panel and the event log. Next, Back, Skip tour; arrow keys and Esc
+work too. It adapts to an exam (guidance stays off). The browser remembers that the tour was seen; **How to use** in
+the header opens it again. A SCORM package shows it on a first launch, not when a saved run resumes. The tour is not a
+lab action: it never makes a run practice, a mistake or a step. `?tour=off` keeps it closed, `?tour=on` always opens
+it.
+
 ## Moodle and other learning platforms (SCORM 1.2)
 
 ```
@@ -126,7 +138,8 @@ node build-scorm.js      # writes dist/scorm/: one package per lab, and one with
 ```
 
 Inside a learning platform the simulator reports completion, a score (100 minus 10 per mistake, pass mark 70, for
-runs done with guidance off; the RAM Distributor exam also takes off the plan points above), time spent and the step reached, and resumes where the student stopped. Outside one it
+runs done with guidance off; the RAM Distributor exam also takes off the plan points above), time spent and the step reached, and resumes where the student stopped. Every package opens with the How to use tour
+on a first launch. Outside one it
 works exactly as the plain page. Setup steps: `docs/MOODLE_SCORM.md`.
 
 ## Layout

@@ -24,6 +24,11 @@ Lab names, the pass mark and the points per mistake are set in `models/<id>/mani
 Inside Moodle the model and scenario menus are hidden. The header shows the lab name and whether the current run
 is graded.
 
+On a first launch the package opens with the How to use tour of the screen: the course bar, Guidance and the graded
+or practice rule (with the package's own pass mark and points per mistake), progress, the step, the workbench and the
+reference panels. It does not open when a saved run resumes, and **How to use** in the header opens it again. The tour
+is not a lab action: it never turns a run into practice.
+
 ## Adding one lab
 
 1. In the course, turn **Edit mode** on.
