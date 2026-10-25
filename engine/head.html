@@ -94,6 +94,34 @@ button,select{font:inherit;color:inherit}
 .lmsbar .mode.warn{background:rgba(255,180,58,.12);border-color:rgba(255,180,58,.5);color:#FFD18A}
 .in-lms .lmsbar{display:flex}.in-lms .top label{display:none}.in-lms .pick{display:none}
 
+/* ---- How to use: the tour (engine/tour.js). A dimmed page, the part spotlighted with an amber keyline, a label-stock card ---- */
+.tourbtn{margin-left:6px}
+.tour{position:fixed;inset:0;z-index:100}
+.tour [hidden]{display:none!important}
+.touring *{scroll-margin:16px}
+.tour-veil{position:absolute;inset:0}
+.tour.center .tour-veil{background:rgba(9,13,16,.66)}
+.tour-hole{position:fixed;border:3px solid var(--led);border-radius:10px;box-shadow:0 0 0 200vmax rgba(9,13,16,.62),0 0 18px rgba(233,155,22,.55);pointer-events:none;transition:left .18s,top .18s,width .18s,height .18s}
+.tour-card{position:fixed;width:min(392px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;padding:16px 18px 14px;border-radius:10px;background:var(--label);color:var(--ink);
+  border:1px solid var(--line);border-top:5px solid var(--led);box-shadow:0 18px 50px rgba(0,0,0,.45)}
+.tour.center .tour-card{left:50%!important;top:50%!important;transform:translate(-50%,-50%);width:min(500px,calc(100vw - 24px))}
+.tour-k{font:700 12.5px/1.2 var(--font);letter-spacing:.04em;text-transform:uppercase;color:var(--amber)}
+.tour-card h2{font-size:26px;margin:4px 0 8px}
+.tour-t p{margin:0 0 8px;font-size:15px;line-height:1.5}
+.tour-flow{list-style:none;counter-reset:f;margin:12px 0 4px;padding:0;display:grid;gap:8px}
+.tour-flow li{counter-increment:f;display:grid;grid-template-columns:30px minmax(0,1fr);column-gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--rule);border-radius:7px;background:var(--label-2)}
+.tour-flow li::before{content:counter(f);grid-row:span 2;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--led);color:var(--led-ink);font:700 15px var(--font)}
+.tour-flow b{font-size:15px}.tour-flow span{font-size:13.5px;color:var(--muted)}
+.tour-dots{display:flex;flex-wrap:wrap;gap:4px;margin:10px 0 12px}
+.tour-dots i{width:16px;height:5px;border-radius:3px;background:var(--rule)}
+.tour-dots i.past{background:color-mix(in srgb,var(--led) 45%,var(--rule))}.tour-dots i.on{background:var(--led)}
+.tour-b{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tour-b span{display:flex;gap:8px}
+.tour-skip{border:0;background:none;padding:6px 2px;color:var(--muted);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:14px}
+.tour-skip:hover{color:var(--ink)}
+@media (max-width:640px){.tourbtn{margin-left:auto;padding:0 10px}.tourbtn .tl{display:none}.tour-card h2{font-size:23px}.tour-t p{font-size:14.5px}}
+@media (prefers-reduced-motion:reduce){.tour-hole{transition:none}}
+
 /* ---- Layout ---- */
 .grid{display:grid;grid-template-columns:208px minmax(0,1fr) 344px;grid-template-areas:"nav work side";gap:18px;padding:18px 22px 10px;align-items:start;max-width:1760px;margin:0 auto}
 .navwrap{grid-area:nav;position:sticky;top:14px;min-width:0}
@@ -453,6 +481,7 @@ footer.copy{margin:16px 0 0;font-size:12.5px;color:var(--muted)}
   <div class="plate">
     <svg class="mark" viewBox="0 0 38 28" aria-hidden="true"><rect x="1" y="1" width="36" height="26" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="5" y="5.5" width="20" height="4" rx="1" fill="currentColor" opacity=".55"/><rect x="5" y="12" width="20" height="4" rx="1" fill="currentColor" opacity=".55"/><rect x="5" y="18.5" width="20" height="4" rx="1" fill="currentColor" opacity=".55"/><circle cx="31" cy="7.5" r="2.2" fill="#45DB86"/><circle cx="31" cy="14" r="2.2" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
     <h1>Server build trainer</h1>
+    <button class="tg tourbtn" id="tourbtn" type="button" aria-label="How to use" title="A short tour of the screen: what each part does and how a lab works"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6.1 6.2a2 2 0 1 1 2.7 1.9c-.5.2-.8.6-.8 1.1v.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.9" r=".95" fill="currentColor"/></svg><span class="tl">How to use</span></button>
   </div>
   <div id="lmsbar" class="lmsbar" aria-live="polite"></div>
   <div class="pick">

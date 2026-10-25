@@ -6,6 +6,7 @@ const path = require('path');
 const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '..', 'dist', 'index.html'));
 (async () => {
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1400, height: 1000 } });
+  await p.addInitScript(() => { try { localStorage.setItem('sbt.tour', 'seen'); } catch (e) { } });   // the first-visit tour stays closed (tests/tour.js covers it)
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto(FILE);
   const models = await p.evaluate(() => Sim.modelOrder); let bad = 0;
