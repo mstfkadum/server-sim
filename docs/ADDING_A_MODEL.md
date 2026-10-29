@@ -199,8 +199,14 @@ of the shell. `node tests/os-install.js` checks the mistakes each installer catc
 5. The model's maintenance and service guide.
 6. The scenarios wanted, and the training-deck slides that go with them.
 
-Use invented lab values for passwords, IP addresses, MAC addresses and serial numbers: a hosted page is readable
-by anyone who has the link.
+**No real device data from any image.** The photos, screenshots and videos show real values: serial numbers
+(chassis, power supplies, drives, DIMMs, CPUs), part and asset tags, MAC and WWN addresses, IP addresses, host names,
+management controller names, user names, passwords (pull tabs, default-password stickers), UUIDs and licence keys.
+Never copy any of them into the pack, a comment, a test, the docs, a commit message or a pull request, not even as
+an example. Use invented lab values instead, and blank or paint over every label, sticker and screen value in an
+image before it goes into the pack (the power supply label is blanked to white paper, and the simulator prints its
+own invented serial numbers on it). When in doubt whether a value is real, treat it as real. A hosted page is
+readable by anyone who has the link, and a value pushed to GitHub stays in the history.
 
 ## Tests
 
