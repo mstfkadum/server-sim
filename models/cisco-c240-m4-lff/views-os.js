@@ -111,10 +111,29 @@ function kvmHtml(t, b) {
 // Cisco IMC, Compute, BIOS: the boot order the server reports
 function cimcCompute(t, b) {
   const L = t.os ? OSI.bootList(t) : t.flags.hasOS ? [{ id: 'disk', label: 'Rocky Linux', os: true }] : [];
-  const rows = [...L.filter(x => x.os).map(x => [x.label, 'UEFI', 'HDD']), ...(t.os && t.os.media ? [['Cisco vKVM-Mapped vDVD1.22', 'UEFI', 'VMEDIA']] : []), ['UEFI: Built-in EFI Shell', 'UEFI', 'EFI'], ['UEFI: PXE IPv4 Cisco VIC Ethernet Interface', 'UEFI', 'PXE']];
-  return `<div class="tabs">${b('BIOS', 'cimcMisc', 'tab', 'on')}${b('Remote Management', 'cimcMisc', 'Remote Management')}${b('Troubleshooting', 'cimcMisc', 'Troubleshooting')}${b('Power Policies', 'cimcMisc', 'Power Policies')}${b('PID Catalog', 'cimcMisc', 'PID Catalog')}</div><h4 style="margin-top:0">BIOS Properties</h4><div class="kv"><span>Running Version:</span><span>C240M4.4.1.2c.0.0202211901</span><span>UEFI Secure Boot:</span><span>Disabled</span><span>Actual Boot Mode:</span><span>Uefi</span><span>Configured Boot Mode:</span><span>UEFI</span><span>Last Configured Boot Order Source:</span><span>BIOS</span></div>
-<h4>Actual Boot Order</h4><table><tr><th>Name</th><th>Boot Mode</th><th>Type</th></tr>${rows.map(r => `<tr><td>${esc(r[0])}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</table><p class="cap" style="font-size:12.5px;margin-top:8px">Cisco IMC reads this list from the BIOS: the installed operating system's own UEFI entry comes first.</p>`;
+  const rows = [...L.map(x => x.os ? [x.label, 'UEFI', 'HDD'] : ['Cisco vKVM-Mapped vDVD1.22', 'UEFI', 'VMEDIA']), ['UEFI: Built-in EFI Shell', 'UEFI', 'EFI'], ['UEFI: PXE IPv4 Cisco VIC Ethernet Interface', 'UEFI', 'PXE']];
+  const c = t.cimc, ord = t.os ? OSI.order(t) : ['disk', 'cd'];
+  return `<div class="tabs">${b('BIOS', 'cimcMisc', 'tab', 'on')}${b('Remote Management', 'cimcMisc', 'Remote Management')}${b('Troubleshooting', 'cimcMisc', 'Troubleshooting')}${b('Power Policies', 'cimcMisc', 'Power Policies')}${b('PID Catalog', 'cimcMisc', 'PID Catalog')}</div><h4 style="margin-top:0">BIOS Properties</h4><div class="kv"><span>Running Version:</span><span>C240M4.4.1.2c.0.0202211901</span><span>UEFI Secure Boot:</span><span>Disabled</span><span>Actual Boot Mode:</span><span>Uefi</span><span>Configured Boot Mode:</span><span>UEFI</span><span>Last Configured Boot Order Source:</span><span>${t.os && t.os.order ? 'CIMC' : 'BIOS'}</span></div>
+<h4>Configured Boot Order</h4><table><tr><th>Order</th><th>Device Type</th></tr>${ord.map((k, i) => `<tr><td>${i + 1}</td><td>${BODEV[k]}</td></tr>`).join('')}</table><p style="margin:8px 0 0">${b('Configure Boot Order', 'cimcBoOpen')}</p>
+<h4>Actual Boot Order</h4><table><tr><th>Name</th><th>Boot Mode</th><th>Type</th></tr>${rows.map(r => `<tr><td>${esc(r[0])}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</table><p class="cap" style="font-size:12.5px;margin-top:8px">Cisco IMC reads this list from the BIOS, in the configured order. The virtual DVD is listed while an image is mapped. A new order applies at the next start of the server.</p>`
+    + (c.boDlg ? `<div class="dlgwrap"><div class="dlg" role="dialog" aria-label="Configure Boot Order"><header>Configure Boot Order</header><div class="in"><p style="margin:0 0 8px">Select a device, then move it up or down. The server tries the devices from the top.</p><table><tr><th>Order</th><th>Device Type</th></tr>${c.boEdit.map((k, i) => `<tr class="${c.boSel === k ? 'sel' : ''}"><td>${i + 1}</td><td>${b(BODEV[k], 'cimcBoSel', k, c.boSel === k ? 'on' : '')}</td></tr>`).join('')}</table><p style="margin:8px 0 0">${b('Up', 'cimcBoMove', 'up')}${b('Down', 'cimcBoMove', 'down')}</p></div><footer>${b('Save Changes', 'cimcBoSave', '', 'blue')}${b('Cancel', 'cimcBoCancel')}</footer></div></div>` : '');
 }
+// Compute, BIOS, Configure Boot Order: the order of the boot disk and the virtual DVD. One-time boot (F6, Boot Device) still overrides it.
+const BODEV = { disk: 'Local HDD (RAID virtual drive)', cd: 'Virtual Media: Cisco vKVM-Mapped vDVD' };
+Sim.on('cimcBoOpen', () => { if (!cimcOk()) return; if (!T.os) return say('info', 'The boot order is not part of this exercise.'); Object.assign(T.cimc, { boDlg: true, boEdit: OSI.order(T).slice(), boSel: null }); });
+Sim.on('cimcBoSel', k => { if (T.cimc.boDlg) T.cimc.boSel = k; });
+Sim.on('cimcBoMove', d => {
+  const c = T.cimc; if (!c.boDlg) return; if (!c.boSel) return say('info', 'Select a device in the list first.');
+  const i = c.boEdit.indexOf(c.boSel), j = i + (d === 'up' ? -1 : 1); if (j < 0 || j >= c.boEdit.length) return;
+  [c.boEdit[i], c.boEdit[j]] = [c.boEdit[j], c.boEdit[i]];
+});
+Sim.on('cimcBoCancel', () => { T.cimc.boDlg = false; });
+Sim.on('cimcBoSave', () => {
+  if (!cimcOk()) return; const c = T.cimc; c.boDlg = false; OSI.setOrder(T, c.boEdit);
+  const cd = c.boEdit[0] === 'cd';
+  say('ok', `Boot order saved: ${BODEV[c.boEdit[0]]} first. It applies at the next start of the server.${cd ? ' While an image is mapped, every restart boots it, even after the OS is installed: unmap it, or put the HDD first again, when the install is done.' : ''}`);
+});
+Sim.listen('click', e => { if (Sim.view === 'cimc' && T.cimc.boDlg && e.target.matches && e.target.matches('.simui .dlgwrap')) Sim.do('cimcBoCancel', ''); });
 Sim.on('kvmMenu', k => { const c = T.cimc; c.kvmMenu = c.kvmMenu === k ? null : k; });
 Sim.on('kvmPower', k => {
   const c = T.cimc; c.kvmMenu = null;

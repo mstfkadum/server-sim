@@ -186,13 +186,17 @@ Sim.registerView({
         <div><h4 style="margin-top:0">IPv4 Properties</h4><div class="kv"><span>Enable IPv4:</span><span><button class="chk" disabled aria-label="Enable IPv4">&#10003;</button></span><span>Use DHCP:</span><span>${chk(f.dhcp, 'cimcDhcp', 'Use DHCP')}</span><span>Management IP Address:</span><span>${fin('ip', 'text', dis)}</span><span>Subnet Mask:</span><span>${fin('mask', 'text', dis)}</span><span>Gateway:</span><span>${fin('gw', 'text', dis)}</span><span>Preferred DNS Server:</span><span>${fin('dns', 'text', dis + ' data-enter="cimcSaveNet"')}</span></div></div></div>
         <p style="text-align:right;margin:16px 0 0">${b('Save Changes', 'cimcSaveNet', '', 'blue')}</p>`;
     }
-    return h + `</div></div></div>`;
+    h += `</div></div></div>`;
+    // the lab task, outside the simulated browser, right under it: compare the saved values with the work order, then confirm
+    if (c.page === 'network') {
+      const chkRows = [['NIC mode', 'Dedicated', c.net.mode], ['NIC redundancy', 'None', c.net.red], ['DHCP', 'Disabled', c.net.dhcp ? 'Enabled' : 'Disabled'], ['IP address', WO.ip, c.net.ip], ['Subnet mask', WO.mask, c.net.mask], ['Gateway', WO.gw, c.net.gw]];
+      h += `<div class="cverify cueable${c.verified ? ' done' : ''}"><h3>Task: verify against the work order</h3><p>Compare every saved value with the work order, then confirm.</p><table class="dec"><tr><td></td><td>Work order</td><td>Saved</td></tr>${chkRows.map(([k, w, v]) => `<tr><td>${k}</td><td>${w}</td><td>${esc(v)}</td></tr>`).join('')}</table>${c.verified ? '<p class="okv">&#10003; Confirmed: the settings match the work order.</p>' : `<p style="margin:8px 0 0">${button('Confirm: settings match the work order', 'cimcVerify')}</p>`}</div>`;
+    }
+    return h;
   },
   tray(t) {
     const c = t.cimc, row = (k, v) => `<tr><td>${k}</td><td>${v}</td></tr>`;
-    const chkRows = [['NIC mode', 'Dedicated', c.net.mode], ['NIC redundancy', 'None', c.net.red], ['DHCP', 'Disabled', c.net.dhcp ? 'Enabled' : 'Disabled'], ['IP address', WO.ip, c.net.ip], ['Subnet mask', WO.mask, c.net.mask], ['Gateway', WO.gw, c.net.gw]];
     return `<h2>Work order</h2><table class="dec">${row('CIMC IP', WO.ip + ' (/24)')}${row('Gateway', WO.gw)}${row('NIC mode', 'Dedicated, redundancy None')}${row('Console account', WO.user + ' / ' + WO.pw)}${row('Then', 'change the password to a new strong one')}</table>
-      ${c.auth && c.page === 'network' ? `<h3>Verify against the work order</h3><table class="dec"><tr><td></td><td>Work order</td><td>On screen</td></tr>${chkRows.map(([k, w, s]) => `<tr><td>${k}</td><td>${w}</td><td>${esc(s)}</td></tr>`).join('')}</table><p style="margin:8px 0 0">${button('Confirm: settings match the work order', 'cimcVerify')}</p>` : ''}
       <h3>Account</h3><ul class="rules"><li>${c.pwSrc === 'factory' ? 'Factory default account: admin / password' : c.pwSrc === 'console' ? `Set from the console: admin / ${esc(WO.pw)}` : c.pwSrc === 'preset' ? 'Account for this scenario: admin / Lab-Train1ng!' : 'admin and the new password you set'}</li><li>The browser warns about the certificate the first time: Cisco IMC uses a self-signed certificate</li><li>Keep the new password in the password vault, never on a label (slide 33)</li></ul>
       <h3>Strong password rules used here</h3><ul class="rules"><li>At least 8 characters</li><li>Characters from three of four groups: upper case, lower case, digits, special characters</li><li>Must not contain the user name</li><li>No character more than three times in a row</li></ul>
       <p class="cap" style="font-size:13px">The screens follow your Cisco IMC screenshots. Host Power, Locator LED and KVM act on the same twin as the front panel and the console.</p>`;
@@ -229,7 +233,7 @@ Sim.on('cimcNav', a => {
   if (!cimcOk()) return; const c = T.cimc;
   if (a === 'admin') { c.adminOpen = !c.adminOpen; return; }
   if (a === 'chassis') { c.chassisOpen = !c.chassisOpen; if (c.chassisOpen && !['summary', 'inventory', 'faults'].includes(c.page)) { c.page = 'summary'; c.dlg = false; } return; }
-  c.page = a; c.dlg = false;
+  c.page = a; c.dlg = false; c.boDlg = false;
   if (a === 'network') { Object.assign(c.form, c.net); say('info', 'Admin, Networking: the management controller\'s own network settings. Compare them with the work order in the panel on the right.'); }
   else if (a === 'users') say('info', 'Local User Management: 15 user slots. Slot 1 is the built-in admin account.');
   else if (a === 'inventory' || a === 'faults') { if (a === 'inventory') c.invTab = 'psu'; cimcPsuSeen(a); }
@@ -251,9 +255,11 @@ Sim.on('cimcVerify', () => {
   c.verified = true; say('ok', 'Verified: NIC mode, redundancy, DHCP, IP address, subnet mask and gateway all match the work order.');
 });
 Sim.on('cimcRow', () => { if (!cimcOk()) return; T.cimc.rowSel = !T.cimc.rowSel; });
-Sim.on('cimcModify', () => { if (!cimcOk()) return; const c = T.cimc; if (!c.rowSel) return bad('Select a user first: tick the checkbox for user 1, admin.'); c.dlg = true; c.chg = false; c.form.np = ''; c.form.cp = ''; });
+Sim.on('cimcModify', () => { if (!cimcOk()) return; const c = T.cimc; if (!c.rowSel) return say('warn', 'Select a user first: tick the checkbox for user 1, admin, then click Modify User.'); c.dlg = true; c.chg = false; c.form.np = ''; c.form.cp = ''; });
 Sim.on('cimcChg', () => { if (!cimcOk()) return; T.cimc.chg = !T.cimc.chg; });
 Sim.on('cimcCancel', () => { T.cimc.dlg = false; });
+// a click outside the Modify user dialog closes it, as Cancel does: not a mistake
+Sim.listen('click', e => { if (Sim.view === 'cimc' && T.cimc.dlg && e.target.matches && e.target.matches('.simui .dlgwrap')) Sim.do('cimcCancel', ''); });
 Sim.on('cimcSaveUser', () => {
   if (!cimcOk()) return; const c = T.cimc, f = c.form;
   if (!c.chg) { c.dlg = false; return say('info', 'Nothing was changed. Tick Change Password to set a new one.'); }
@@ -361,3 +367,12 @@ function cimcPsuSeen(page, refresh) {
     say('info', `${refresh ? 'Refreshed. ' : ''}Inventory, Power Supplies: ${[0, 1].map(i => `PSU${i + 1} ${T.psu[i].st !== 'in' ? 'not present' : T.psu[i].fault ? 'failed' : psuGood(T, i) ? 'present, ' + psuWatts(T, i).out + ' W out' : 'present, no AC input'}`).join('; ')}.`);
   }
 }
+// the verify task in the side panel: framed, so it stands out with guidance off
+(() => {
+  if (document.getElementById('cis-cimc-css')) return;
+  const s = document.createElement('style'); s.id = 'cis-cimc-css';
+  s.textContent = `.cverify{margin:12px 0 0;max-width:640px;padding:10px 14px;border:3px solid var(--led);border-radius:10px;background:var(--panel);color:var(--ink)}
+.cverify.done{border-color:var(--touch)}.cverify h3{margin:0 0 4px}.cverify p{margin:0 0 6px;font-size:13px}
+.cverify button{font-weight:700}.cverify .okv{color:var(--touch);font-weight:700;margin:8px 0 0}`;
+  Sim.addCss(s);
+})();

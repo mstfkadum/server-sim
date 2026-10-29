@@ -139,7 +139,11 @@ two packs' `views-os.js` are complete examples. The host object holds:
 The pack mounts the image through its management controller and offers the one-time boot, then builds each lab's
 steps with `OSI.steps(os, P)`, where `P` holds `view`, `con(t, fn)` (the cue that reaches the server's screen, then
 `fn`), `mount` and `boot` (steps), `eject` and `readback` (one step each). `OSI.init(t, os, old)` sets up a lab's
-state. `node tests/os-install.js` checks the mistakes each installer catches and the shell's answers.
+state. `OSI.bootList(t)` gives the boot entries in the configured boot order; a pack that lets the student change the
+order (Cisco IMC, Compute, BIOS, Configure Boot Order) calls `OSI.setOrder(t, ['cd', 'disk'])`, read back with
+`OSI.order(t)` (default `['disk', 'cd']`). A one-time boot (`OSI.pickBoot`) still wins for the next start. The shell's
+command line handles Up and Down (history) and Ctrl+L itself, before the pack's key listener; `nmtui` (Rocky) is part
+of the shell. `node tests/os-install.js` checks the mistakes each installer catches and the shell's answers.
 
 **Readiness rules:** `Sim.registerRule(t => [{ lvl: 'fail' | 'warn', msg: '...' }])`.
 

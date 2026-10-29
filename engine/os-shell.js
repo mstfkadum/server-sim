@@ -34,12 +34,44 @@ OSI.term = {
       tm.mode = 'sh'; if (line === kd.userPw(t, 'root') && kd.rootLogin(t)) { tm.root = true; tm.suFrom = tm.user; return; }
       OSI.term.print(t, 'su: Authentication failure'); return;
     }
+    tm.hi = null; tm.draft = '';
     if (!line.trim()) return;
-    tm.hist.push(line); if (tm.hist.length > 50) tm.hist.shift();
+    // bash keeps every command, but not the same command twice in a row (HISTCONTROL ignoredups on Rocky, ignoreboth on Ubuntu)
+    if (tm.hist[tm.hist.length - 1] !== line) tm.hist.push(line); if (tm.hist.length > 50) tm.hist.shift();
     OSI.term.exec(t, line, false);
   },
+  // Up and Down walk the command history, as in bash: Down past the newest command gives back the line being typed
+  histMove(t, d) {
+    const tm = t.os.term; if (!tm || !tm.hist || !tm.hist.length || ['boot', 'login', 'pw', 'sudo', 'su'].includes(tm.mode)) return;
+    if (tm.hi == null) { if (d > 0) return; tm.draft = tm.cmd; tm.hi = tm.hist.length; }
+    tm.hi = Math.max(0, Math.min(tm.hist.length, tm.hi + d));
+    if (tm.hi === tm.hist.length) { tm.cmd = tm.draft || ''; tm.hi = null; } else tm.cmd = tm.hist[tm.hi];
+  },
+  // Ctrl+L: clear the screen; the prompt and the line being typed stay
+  cls(t) { const tm = t.os.term; if (tm && !['boot'].includes(tm.mode)) OSI.term.clear(t); },
   exec(t, line, sudo) { const kd = OSI.kinds[t.os.sys.os], r = kd.run(t, line, sudo); if (r && r.length) OSI.term.print(t, r); }
 };
+CORE.osHist = d => { if (T.os && T.os.term && T.os.scr === 'sys') OSI.term.histMove(T, d === 'down' ? 1 : -1); };
+CORE.osCls = () => { if (T.os && T.os.term && T.os.scr === 'sys') OSI.term.cls(T); };
+// keys in the console's command line: Up and Down (history) and Ctrl+L (clear), before any model's own key handling
+document.addEventListener('keydown', e => {
+  const tg = e.target; if (!T || !T.os || !tg || !tg.matches || !tg.matches('#stage input.osin[data-field="os.cmd"]')) return;
+  let a = null;
+  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.altKey && !e.ctrlKey && !e.metaKey) a = ['osHist', e.key === 'ArrowUp' ? 'up' : 'down'];
+  else if (e.ctrlKey && !e.altKey && !e.metaKey && (e.key === 'l' || e.key === 'L')) a = ['osCls', ''];
+  if (!a) return;
+  e.preventDefault(); e.stopImmediatePropagation(); Sim.do(a[0], a[1]); OSI.focus();
+}, true);
+// keys while nmtui is up: Tab and Shift+Tab, the arrows, Enter, Space (not in a text field) and Esc
+document.addEventListener('keydown', e => {
+  const tm = T && T.os && T.os.term, tg = e.target; if (!tm || tm.mode !== 'nmtui' || !document.querySelector('#stage .osx.nmt')) return;
+  if (tg && tg !== document.body && !(tg.closest && tg.closest('#stage .osx.nmt'))) return;
+  const inTxt = tg && tg.matches && tg.matches('input.osin');
+  const m = { ArrowUp: 'Up', ArrowDown: 'Down', Enter: 'Enter', Escape: 'Esc' };
+  let k = e.key === 'Tab' ? (e.shiftKey ? 'BackTab' : 'Tab') : m[e.key] || (e.key === ' ' && !inTxt ? 'Space' : null);
+  if (!k || e.altKey || e.ctrlKey || e.metaKey) return;
+  e.preventDefault(); e.stopImmediatePropagation(); Sim.do('osKey', k); OSI.focus();
+}, true);
 // a command line: words, with simple quotes; pipes split
 const osWords = s => { const out = []; let cur = '', q = null, any = false; for (const ch of s) { if (q) { if (ch === q) q = null; else cur += ch; } else if (ch === '"' || ch === "'") { q = ch; any = true; } else if (/\s/.test(ch)) { if (cur || any) out.push(cur); cur = ''; any = false; } else cur += ch; } if (cur || any) out.push(cur); return out; };
 const osPipes = s => { const out = []; let cur = '', q = null; for (const ch of s) { if (q) { if (ch === q) q = null; cur += ch; } else if (ch === '"' || ch === "'") { q = ch; cur += ch; } else if (ch === '|') { out.push(cur); cur = ''; } else cur += ch; } out.push(cur); return out.map(x => x.trim()); };
@@ -70,8 +102,9 @@ OSI.linux = os => {
   const thr = t => { const c = H().cpu(t); return c.sockets * c.cores * 2; };
   const nicOf = (t, dev) => H().nics(t).find(n => n.dev === dev);
   // the address on a port: only the one configured in the installer, and only with a link
-  const addrOf = (t, n) => { const y = sys(t); return y.iface === n.dev && y.addr ? { addr: y.addr, prefix: y.prefix } : null; };
-  const live = t => { const y = sys(t), n = nicOf(t, y.iface); return !!(n && n.link && y.addr); };
+  const addrOf = (t, n) => { const y = sys(t); return y.iface === n.dev && y.addr && !y.nmOff ? { addr: y.addr, prefix: y.prefix } : null; };
+  const live = t => { const y = sys(t), n = nicOf(t, y.iface); return !!(n && n.link && y.addr && !y.nmOff); };
+  const upOn = (t, n) => n.dev === sys(t).iface && !sys(t).nmOff;          // the port the active connection is on
   const v6 = mac => { const p = mac.split(':').map(x => parseInt(x, 16)); p[0] ^= 2; const h = x => x.toString(16).padStart(2, '0'); return `fe80::${h(p[0])}${h(p[1])}:${h(p[2])}ff:fe${h(p[3])}:${h(p[4])}${h(p[5])}`.replace(/:0+([0-9a-f])/g, ':$1'); };
   const bootMsgs = t => [`${m.pretty}: starting`, '', `[    0.000000] Linux version ${m.kernel}`, `[    0.000000] DMI: ${H().vendor} ${H().product}, BIOS ${H().bios.ver} ${H().bios.date}`, `[    0.000000] Memory: ${usable(H().memGB(t))}G available`, `[    0.512443] smpboot: Total of ${thr(t)} processors activated`, '[    2.031876] EXT4-fs (dm-0): mounted filesystem with ordered data mode.', '[  OK  ] Reached target local-fs.target - Local File Systems.', `[  OK  ] Started ${ub ? 'systemd-networkd.service - Network Configuration' : 'NetworkManager.service - Network Manager'}.`, `[  OK  ] Started ${ub ? 'ssh.service - OpenBSD Secure Shell server' : 'sshd.service - OpenSSH server daemon'}.`, '[  OK  ] Reached target multi-user.target - Multi-User System.'];
   const banner = t => ub ? ['', ...(sys(t).boots === 1 ? [`[  ${(9.8).toFixed(1)}] cloud-init[1304]: Cloud-init v. 24.1.3-0ubuntu3.3 finished. Datasource DataSourceNone.`, ''] : []), `${m.pretty} ${sys(t).host} tty1`, ''] : ['', m.pretty, `Kernel ${m.kernel} on an x86_64`, '', 'Activate the web console with: systemctl enable --now cockpit.socket', ''];
@@ -80,6 +113,7 @@ OSI.linux = os => {
   function sysScreen(t) {
     const tm = t.os.term;
     if (!tm || tm.mode === 'boot') { const L = bootMsgs(t); return `<div class="osx lc"><pre class="lcl">${esc(L.slice(0, Math.min(L.length, 1 + Math.floor(osAge(sys(t).boot) * 4))).join('\n'))}</pre></div>`; }
+    if (tm.mode === 'nmtui') return nmScreen(t);
     return OSI.term.screen(t);
   }
   const auth = (t, u, p) => { const y = sys(t); return (u === y.user && p === y.pw) || (!ub && u === 'root' && p === y.rootPw); };
@@ -142,7 +176,7 @@ OSI.linux = os => {
     if (/^r/.test(sub)) { t.os.ran.ip = true; return live(t) ? [`default via ${y.gw} dev ${y.iface} proto static${ub ? '' : ' metric 100'}`, `${(() => { const n = osIp(y.addr) & osMaskN(y.prefix); return [n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join('.'); })()}/${y.prefix} dev ${y.iface} proto kernel scope link src ${y.addr}${ub ? '' : ' metric 100'}`] : []; }
     if (/^n/.test(sub)) return live(t) ? [`${y.gw} dev ${y.iface} lladdr 00:00:5e:00:01:28 REACHABLE`] : [];
     t.os.ran.ip = true;
-    const st = n => { const up = n.dev === y.iface; return { flags: up ? (n.link ? '<BROADCAST,MULTICAST,UP,LOWER_UP>' : '<NO-CARRIER,BROADCAST,MULTICAST,UP>') : '<BROADCAST,MULTICAST>', state: up && n.link ? 'UP' : 'DOWN' }; };
+    const st = n => { const up = upOn(t, n); return { flags: up ? (n.link ? '<BROADCAST,MULTICAST,UP,LOWER_UP>' : '<NO-CARRIER,BROADCAST,MULTICAST,UP>') : '<BROADCAST,MULTICAST>', state: up && n.link ? 'UP' : 'DOWN' }; };
     const lnk = /^l/.test(sub);
     if (br) return osTable([...(dev ? [] : [lnk ? ['lo', 'UNKNOWN', '00:00:00:00:00:00', '<LOOPBACK,UP,LOWER_UP>'] : ['lo', 'UNKNOWN', '127.0.0.1/8 ::1/128']]), ...list.map(n => { const s2 = st(n), a = addrOf(t, n); return lnk ? [n.dev, s2.state, n.mac.toLowerCase(), s2.flags] : [n.dev, s2.state, [a && n.link ? `${a.addr}/${a.prefix}` : '', s2.state === 'UP' ? `${v6(n.mac)}/64` : ''].filter(Boolean).join(' ')]; })]);
     const L = dev ? [] : ['1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000', '    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00', ...(lnk ? [] : ['    inet 127.0.0.1/8 scope host lo', '       valid_lft forever preferred_lft forever', '    inet6 ::1/128 scope host noprefixroute', '       valid_lft forever preferred_lft forever'])];
@@ -190,7 +224,7 @@ OSI.linux = os => {
     }
     return null;
   }
-  const PATH = ['ls', 'cat', 'grep', 'head', 'tail', 'wc', 'lsmem', 'free', 'dmidecode', 'lscpu', 'nproc', 'lsblk', 'fdisk', 'df', 'ip', 'ping', 'ethtool', 'lspci', 'hostnamectl', 'hostname', 'uname', 'whoami', 'id', 'uptime', 'date', 'sudo', 'su', 'exit', 'logout', 'reboot', 'shutdown', 'poweroff', 'clear', 'history', 'help', 'echo', 'pwd', 'systemctl', ...(ub ? ['networkctl'] : ['nmcli'])];
+  const PATH = ['ls', 'cat', 'grep', 'head', 'tail', 'wc', 'lsmem', 'free', 'dmidecode', 'lscpu', 'nproc', 'lsblk', 'fdisk', 'df', 'ip', 'ping', 'ethtool', 'lspci', 'hostnamectl', 'hostname', 'uname', 'whoami', 'id', 'uptime', 'date', 'sudo', 'su', 'exit', 'logout', 'reboot', 'shutdown', 'poweroff', 'clear', 'history', 'help', 'echo', 'pwd', 'systemctl', ...(ub ? ['networkctl'] : ['nmcli', 'nmtui'])];
   function cmd(t, w, sudo) {
     const y = sys(t), h = H(), tm = t.os.term, root = sudo || tm.root, c0 = w[0], mem = h.memGB(t);
     switch (c0) {
@@ -225,13 +259,16 @@ OSI.linux = os => {
       case 'grep': { const f = w[w.length - 1], r = files(t, f); if (!r || w.length < 3) return [`grep: ${f}: No such file or directory`]; const g = osFilter(r, w.slice(0, -1)); return g.err ? [g.err] : g.lines; }
       case 'nmcli': if (ub) return ["Command 'nmcli' not found, but can be installed with:", '', 'sudo apt install network-manager', '', '(Ubuntu Server uses netplan and systemd-networkd: networkctl, ip a.)'];
         t.os.ran.ip = true;
-        if (/^c/.test(w[1] || '')) return osTable([['NAME', 'UUID', 'TYPE', 'DEVICE'], ...h.nics(t).map((n, k) => [n.dev, `5e2b1c7a-${(4000 + k).toString(16)}-4b8e-9d3f-2a6c8e1b0f${k}${k}`, 'ethernet', n.dev === y.iface && n.link ? n.dev : '--']), ['lo', '2f7e9c41-0d3b-4a59-8e6f-1c2b3a4d5e6f', 'loopback', 'lo']]);
-        return osTable([['DEVICE', 'TYPE', 'STATE', 'CONNECTION'], ...h.nics(t).map(n => [n.dev, 'ethernet', !n.link ? 'unavailable' : n.dev === y.iface ? 'connected' : 'disconnected', n.dev === y.iface && n.link ? n.dev : '--']), ['lo', 'loopback', 'connected (externally)', 'lo']]);
+        if (/^c/.test(w[1] || '') && /^(up|down)$/.test(w[2] || '')) { if (!w[3]) return [`Error: neither a valid connection nor device given.`]; const r = w[2] === 'up' ? nmUp(t, w[3]) : nmDown(t, w[3]); return r.err ? [`Error: ${r.err}`] : [r.ok]; }
+        if (/^c/.test(w[1] || '')) return osTable([['NAME', 'UUID', 'TYPE', 'DEVICE'], ...h.nics(t).map((n, k) => [n.dev, `5e2b1c7a-${(4000 + k).toString(16)}-4b8e-9d3f-2a6c8e1b0f${k}${k}`, 'ethernet', upOn(t, n) && n.link ? n.dev : '--']), ['lo', '2f7e9c41-0d3b-4a59-8e6f-1c2b3a4d5e6f', 'loopback', 'lo']]);
+        return osTable([['DEVICE', 'TYPE', 'STATE', 'CONNECTION'], ...h.nics(t).map(n => [n.dev, 'ethernet', !n.link ? 'unavailable' : upOn(t, n) ? 'connected' : 'disconnected', upOn(t, n) && n.link ? n.dev : '--']), ['lo', 'loopback', 'connected (externally)', 'lo']]);
+      case 'nmtui': if (ub) return ["Command 'nmtui' not found, but can be installed with:", '', 'sudo apt install network-manager', '', '(Ubuntu Server uses netplan and systemd-networkd: edit /etc/netplan/50-cloud-init.yaml, then sudo netplan apply.)'];
+        nmOpen(t, w[1]); return [];
       case 'networkctl': if (!ub) return ['bash: networkctl: command not found']; t.os.ran.ip = true; return [...osTable([['IDX', 'LINK', 'TYPE', 'OPERATIONAL', 'SETUP'], ['1', 'lo', 'loopback', 'carrier', 'unmanaged'], ...h.nics(t).map((n, k) => [String(k + 2), n.dev, 'ether', n.dev === y.iface ? (n.link ? 'routable' : 'no-carrier') : 'off', n.dev === y.iface ? 'configured' : 'unmanaged'])], [0]), '', `${h.nics(t).length + 1} links listed.`];
       case 'systemctl': { const svc = (w[2] || '').replace('.service', ''); if (w[1] !== 'status' || !svc) return ['(systemctl status <service> is modelled here: ssh or sshd)']; if (!/^sshd?$/.test(svc) || (!y.ssh && ub)) return [`Unit ${svc}.service could not be found.`]; return [`● ${ub ? 'ssh' : 'sshd'}.service - ${ub ? 'OpenBSD Secure Shell server' : 'OpenSSH server daemon'}`, `     Loaded: loaded (/usr/lib/systemd/system/${ub ? 'ssh' : 'sshd'}.service; enabled; preset: enabled)`, `     Active: active (running) since ${new Date(y.boot).toString().slice(0, 24)}`, '   Main PID: 1187 (sshd)', `     CGroup: /system.slice/${ub ? 'ssh' : 'sshd'}.service`, '             └─1187 "sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups"']; }
       case 'clear': OSI.term.clear(t); return [];
       case 'history': return tm.hist.map((x, i) => `${String(i + 1).padStart(5)}  ${x}`);
-      case 'help': return [`GNU bash, version 5.${ub ? '2.21' : '1.8'}(1)-release (x86_64-pc-linux-gnu)`, '', 'This simulated system answers the checks after an install:', '  lsmem  free -g  sudo dmidecode -t memory   lscpu  nproc   lsblk  df -h  sudo fdisk -l', `  ip -br a  ip a  ip r  ethtool <port>  ping -c 3 <address>  lspci  ${ub ? 'networkctl' : 'nmcli device'}`, '  hostnamectl  cat /etc/os-release  uname -a  sudo  reboot  exit', 'Pipes into grep, head, tail and wc -l work.'];
+      case 'help': return [`GNU bash, version 5.${ub ? '2.21' : '1.8'}(1)-release (x86_64-pc-linux-gnu)`, '', 'This simulated system answers the checks after an install:', '  lsmem  free -g  sudo dmidecode -t memory   lscpu  nproc   lsblk  df -h  sudo fdisk -l', `  ip -br a  ip a  ip r  ethtool <port>  ping -c 3 <address>  lspci  ${ub ? 'networkctl' : 'nmcli device  nmtui'}`, '  hostnamectl  cat /etc/os-release  uname -a  sudo  reboot  exit', 'Pipes into grep, head, tail and wc -l work.'];
       case 'exit': case 'logout':
         if (tm.root && !tm.suFrom && tm.user !== 'root') { tm.root = false; return ['logout']; }
         if (tm.root && tm.suFrom) { tm.root = false; tm.suFrom = null; return ['logout']; }
@@ -284,9 +321,110 @@ OSI.linux = os => {
       { text: 'Check the disks: lsblk', hint: 'The OS partitions must be on the boot disk; any other disk stays untouched.', done: r('disk'), cue: t => cmdCue(t, 'lsblk', 'Type lsblk: the disks and the OS partitions.') },
       { get text() { return `Check the network: ip -br a, then ping -c 3 ${osH().net.gw}`; }, get hint() { return `The address on ${OSI.wantNic(T).dev}, state UP; the gateway answers.`; }, done: t => !!(t.os.ran.ip && t.os.ran.ping), cue: t => !t.os.ran.ip ? cmdCue(t, 'ip -br a', 'Type ip -br a: the ports, their state and addresses.') : cmdCue(t, `ping -c 3 ${osH().net.gw}`, `Type ping -c 3 ${osH().net.gw}: the gateway must answer.`) }];
   }
+  /* ---- nmtui (Rocky Linux): NetworkManager's text interface. Edit a connection, Activate a connection, Set system
+     hostname. Each port has a connection profile named after it (the installer writes one per port); the one set in
+     the installer is Manual with the work order's address, the others Automatic (DHCP) and not connected automatically.
+     As in NetworkManager, a saved change to a profile applies when the connection is activated again. ---- */
+  const NMM = { manual: 'Manual', auto: 'Automatic', disabled: 'Disabled' };
+  function nmProf(t) {
+    const y = sys(t);
+    if (!y.nmp) { y.nmp = {}; H().nics(t).forEach(n => { y.nmp[n.dev] = n.dev === y.iface ? { method: 'manual', addr: `${y.addr}/${y.prefix}`, gw: y.gw || '', dns: y.dns || '', auto: true } : { method: 'auto', addr: '', gw: '', dns: '', auto: false }; }); }
+    return y.nmp;
+  }
+  const nmActive = (t, dev) => sys(t).iface === dev && !sys(t).nmOff;
+  function nmUp(t, dev) {
+    const y = sys(t), P = nmProf(t)[dev], n = nicOf(t, dev);
+    if (!P) return { err: `unknown connection '${dev}'.` };
+    if (!n.link) return { err: `Connection activation failed: No suitable device found for this connection (device ${dev} not available because device has no carrier).` };
+    if (P.method === 'auto') return { err: 'Connection activation failed: IP configuration could not be reserved (no available address, timeout, etc.).' };
+    const [a, pf] = P.addr.split('/');
+    Object.assign(y, { iface: dev, nmOff: false, addr: P.method === 'manual' ? a : '', prefix: P.method === 'manual' ? +pf : y.prefix, gw: P.method === 'manual' ? P.gw : '', dns: P.method === 'manual' ? P.dns : y.dns });
+    return { ok: `Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/${(y.nmAct = (y.nmAct || 2) + 1)})` };
+  }
+  function nmDown(t, dev) { if (!nmProf(t)[dev]) return { err: `unknown connection '${dev}'.` }; if (!nmActive(t, dev)) return { err: `'${dev}' is not an active connection.` }; sys(t).nmOff = true; return { ok: `Connection '${dev}' successfully deactivated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/${sys(t).nmAct || 3})` }; }
+  function nmOpen(t, sub) { const tm = t.os.term; tm.mode = 'nmtui'; tm.nm = { s: sub === 'edit' ? 'list' : sub === 'connect' ? 'act' : sub === 'hostname' ? 'host' : 'main', sel: 0, row: H().nics(t)[0].dev, f: null, msg: '' }; if (tm.nm.s === 'host') tm.nm.f = { host: sys(t).host }; }
+  // the items of each screen, in Tab order: rows (r), buttons (b), text fields (x), check boxes (c), option buttons (o)
+  function nmItems(t) {
+    const nm = t.os.term.nm, devs = H().nics(t).map(n => n.dev), f = nm.f;
+    switch (nm.s) {
+      case 'main': return [['r', 'edit', 'Edit a connection'], ['r', 'act', 'Activate a connection'], ['r', 'host', 'Set system hostname'], ['r', 'quit', 'Quit'], ['b', 'ok', 'OK']];
+      case 'list': return [...devs.map(d => ['r', 'dev:' + d, d]), ['b', 'add', 'Add'], ['b', 'edit', 'Edit...'], ['b', 'del', 'Delete'], ['b', 'back', 'Back']];
+      case 'act': return [...devs.map(d => ['r', 'dev:' + d, d]), ['b', 'tog', nmActive(t, nm.row) ? 'Deactivate' : 'Activate'], ['b', 'back', 'Back']];
+      case 'edit': return [['o', 'method', NMM[f.method]], ...(f.method === 'manual' ? [['x', 'addr', 'Addresses'], ['x', 'gw', 'Gateway'], ['x', 'dns', 'DNS servers']] : []), ['c', 'auto', 'Automatically connect'], ['b', 'cancel', 'Cancel'], ['b', 'ok', 'OK']];
+      case 'host': return [['x', 'host', 'Hostname'], ['b', 'cancel', 'Cancel'], ['b', 'ok', 'OK']];
+      default: return [['b', 'ok', 'OK']];            // 'info': a message box
+    }
+  }
+  function nmScreen(t) {
+    const tm = t.os.term, nm = tm.nm, y = sys(t), it = nmItems(t), f = nm.f;
+    const one = i => { const [ty, id, lb] = it[i], on = nm.sel === i;
+      if (ty === 'x') return `<span class="nmf${on ? ' on' : ''}" data-act="osAct" data-arg="nm:${i}"><span class="nml">${esc(lb.padStart(13))}</span> ${osIn('nm.' + id, f[id], { label: lb, cls: on ? 'focus' : '' })}</span>`;
+      if (ty === 'c') return `<button class="nmc${on ? ' on' : ''}" data-act="osAct" data-arg="nm:${i}">[${f[id] ? 'X' : ' '}] ${esc(lb)}</button>`;
+      if (ty === 'o') return `<button class="nmb${on ? ' on' : ''}" data-act="osAct" data-arg="nm:${i}">&lt;${esc(lb)}&gt;</button>`;
+      if (ty === 'r') { const d = id.startsWith('dev:') ? id.slice(4) : null, mark = nm.s === 'act' && d ? (nmActive(t, d) ? '* ' : '  ') : ''; return `<button class="nmr${on ? ' on' : ''}${d && d === nm.row && nm.s !== 'main' ? ' cur' : ''}" data-act="osAct" data-arg="nm:${i}">${esc(mark + lb)}</button>`; }
+      return `<button class="nmb${on ? ' on' : ''}" data-act="osAct" data-arg="nm:${i}">&lt;${esc(lb)}&gt;</button>`; };
+    const idx = pred => it.map((x, i) => i).filter(i => pred(it[i]));
+    let title = '', body = '';
+    if (nm.s === 'main') { title = 'NetworkManager TUI'; body = `<div class="nmt0">Please select an option</div><div class="nmlist">${idx(x => x[0] === 'r').map(i => one(i)).join('')}</div><div class="nmbtns">${idx(x => x[0] === 'b').map(i => one(i)).join('')}</div>`; }
+    else if (nm.s === 'list' || nm.s === 'act') { title = nm.s === 'list' ? 'Edit Connection' : 'Activate Connection'; body = `<div class="nmcol"><div class="nmlist box"><div class="nmhd">Ethernet</div>${idx(x => x[0] === 'r').map(i => one(i)).join('')}</div><div class="nmside">${idx(x => x[0] === 'b').map(i => one(i)).join('')}</div></div>`; }
+    else if (nm.s === 'edit') { const n = nicOf(t, nm.row); title = 'Edit Connection'; body = `<div class="nmf"><span class="nml">${'Profile name'.padStart(13)}</span> ${esc(nm.row)}</div><div class="nmf"><span class="nml">${'Device'.padStart(13)}</span> ${esc(`${nm.row} (${n.mac})`)}</div><div class="nmsec">&#9552; ETHERNET</div><div class="nmsec">&#9562; IPv4 CONFIGURATION ${one(0)}</div>${idx(x => x[0] === 'x').map(i => one(i)).join('')}${f.method === 'manual' ? `<div class="nmf"><span class="nml">${'Routing'.padStart(13)}</span> (No custom routes)</div>` : ''}<div class="nmsec">&#9552; IPv6 CONFIGURATION &lt;Automatic&gt;</div><div>${idx(x => x[0] === 'c').map(i => one(i)).join('')}</div><div class="nmbtns r">${idx(x => x[0] === 'b').map(i => one(i)).join('')}</div>`; }
+    else if (nm.s === 'host') { title = 'Set Hostname'; body = `${one(0)}<div class="nmbtns r">${one(1)}${one(2)}</div>`; }
+    else { title = ''; body = `<div class="nmt0">${esc(nm.msg)}</div><div class="nmbtns">${one(0)}</div>`; }
+    return `<div class="osx nmt"><div class="nmwin${nm.s === 'edit' ? ' wide' : ''}">${title ? `<div class="nmti">${esc(title)}</div>` : ''}${body}</div>${nm.s !== 'info' && nm.msg ? `<div class="nmerr">${esc(nm.msg)}</div>` : ''}<div class="nmkeys">Tab, Up, Down: move  Enter: select  Space: tick  Esc: back</div></div>`;
+  }
+  function nmField(t, f, v) { const nm = t.os.term.nm; if (nm && nm.f && f.startsWith('nm.')) nm.f[f.slice(3)] = v; }
+  const nmCheck = f => {
+    if (f.method !== 'manual') return '';
+    const m = /^(\d+\.\d+\.\d+\.\d+)\/(\d{1,2})$/.exec((f.addr || '').trim());
+    if (!m || osIp(m[1]) === null || +m[2] < 1 || +m[2] > 32) return 'Addresses: type the address with its prefix, for example 10.1.40.120/24.';
+    if (f.gw.trim() && osIp(f.gw.trim()) === null) return 'Gateway is not a valid IPv4 address.';
+    if (f.gw.trim() && ((osIp(m[1]) & osMaskN(+m[2])) >>> 0) !== ((osIp(f.gw.trim()) & osMaskN(+m[2])) >>> 0)) return 'The gateway is not in the subnet of the address.';
+    if (f.dns.trim() && f.dns.split(/[,\s]+/).filter(Boolean).some(d => osIp(d) === null)) return 'DNS servers: not a valid IPv4 address.';
+    return '';
+  };
+  // select item i: a row picks the connection (or opens a menu entry), a button acts, a check box toggles
+  function nmDo(t, i) {
+    const tm = t.os.term, nm = tm.nm, y = sys(t), it = nmItems(t)[i]; if (!it) return; nm.sel = i; const [ty, id] = it;
+    if (ty === 'x') return;
+    if (ty === 'c') { nm.f[id] = !nm.f[id]; return; }
+    if (ty === 'o') { const o = ['manual', 'auto', 'disabled']; nm.f.method = o[(o.indexOf(nm.f.method) + 1) % 3]; return; }
+    nm.msg = '';
+    const go = s => { nm.s = s; nm.sel = 0; };
+    if (nm.s === 'main') { if (id === 'quit') { tm.mode = 'sh'; tm.nm = null; return; } if (id === 'ok') return nmDo(t, 0); if (id === 'host') { nm.f = { host: y.host }; return go('host'); } return go(id === 'edit' ? 'list' : 'act'); }
+    if (nm.s === 'list' || nm.s === 'act') {
+      if (id.startsWith('dev:')) { nm.row = id.slice(4); if (nm.s === 'list' && ty === 'r' && nm.pick === nm.row) id2(); nm.pick = nm.row; return; }
+      if (id === 'back') return go('main');
+      if (id === 'add' || id === 'del') { nm.msg = 'Adding or deleting a connection profile is not part of this lab: each port has its profile.'; return; }
+      if (id === 'edit') return id2();
+      if (id === 'tog') { const r = nmActive(t, nm.row) ? nmDown(t, nm.row) : nmUp(t, nm.row); if (r.err) nm.msg = 'Could not activate connection: ' + r.err.replace(/^Connection activation failed: /, 'Activation failed: '); else say('ok', nmActive(t, nm.row) ? `${nm.row} activated: it now has the address in its profile.` : `${nm.row} deactivated: it has no address now.`); return; }
+    }
+    function id2() { const P = nmProf(t)[nm.row]; nm.f = Object.assign({}, P); nm.s = 'edit'; nm.sel = 0; }
+    if (nm.s === 'edit') {
+      if (id === 'cancel') return go('list');
+      const err = nmCheck(nm.f); if (err) { nm.msg = err; return; }
+      const f = nm.f; nmProf(t)[nm.row] = { method: f.method, addr: (f.addr || '').trim(), gw: (f.gw || '').trim(), dns: (f.dns || '').trim(), auto: !!f.auto };
+      say('info', `Profile ${nm.row} saved. NetworkManager applies it when the connection is activated again: Activate a connection, Deactivate, then Activate (or nmcli con up ${nm.row}).`);
+      return go('list');
+    }
+    if (nm.s === 'host') {
+      if (id === 'cancel') return go('main');
+      const h = (nm.f.host || '').trim(); if (!/^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9-]+)*$/.test(h)) { nm.msg = 'Not a valid hostname: letters, digits and hyphens.'; return; }
+      y.host = h; nm.msg = `Set hostname to '${h}'`; return go('info');
+    }
+    if (nm.s === 'info') { nm.msg = ''; return go('main'); }
+  }
+  function nmKey(t, k) {
+    const nm = t.os.term.nm, n = nmItems(t).length;
+    if (k === 'Up' || k === 'Down' || k === 'Tab' || k === 'BackTab') { nm.sel = (nm.sel + (k === 'Up' || k === 'BackTab' ? -1 : 1) + n) % n; const it = nmItems(t)[nm.sel]; if (it[0] === 'r' && it[1].startsWith('dev:')) nm.row = it[1].slice(4); return; }
+    if (k === 'Enter') { const it = nmItems(t)[nm.sel]; if (it[0] === 'x') { nm.sel = (nm.sel + 1) % n; return; } if (it[0] === 'r' && it[1].startsWith('dev:')) { nm.row = it[1].slice(4); nm.pick = nm.s === 'list' ? null : nm.pick; return nm.s === 'list' ? nmDo(t, nmItems(t).findIndex(x => x[1] === 'edit')) : nmDo(t, nmItems(t).findIndex(x => x[1] === 'tog')); } return nmDo(t, nm.sel); }
+    if (k === 'Space') { const it = nmItems(t)[nm.sel]; if (it[0] === 'c' || it[0] === 'o') nmDo(t, nm.sel); return; }
+    if (k === 'Esc') { if (nm.s === 'main') { t.os.term.mode = 'sh'; t.os.term.nm = null; } else { nm.msg = ''; nm.s = nm.s === 'edit' ? 'list' : 'main'; nm.sel = 0; } }
+  }
+  OSI.nmtui = { key: nmKey };
   const sysCue = t => loginCue(t) || { say: 'Run the checks the step names.' };
   return { boot, sysTick, sysScreen, auth, userPw, motd, prompt, run, sysCue, postSteps,
     loginHost: t => sys(t).host, acct: t => sys(t).user, rootLogin: t => !ub && !!sys(t).rootPw,
-    sysAct: (t, a) => { if (a === 'enter') OSI.term.enter(t); },
-    sysKey: (t, k) => { if (k === 'Enter') OSI.term.enter(t); else if (k === 'Up') { const tm = t.os.term; if (tm && tm.hist.length) tm.cmd = tm.hist[tm.hist.length - 1]; } }, sysKeyBar: [] };
+    sysAct: (t, a) => { if (t.os.term && t.os.term.mode === 'nmtui' && a.startsWith('nm:')) return nmDo(t, +a.slice(3)); if (a === 'enter') OSI.term.enter(t); },
+    sysField: (t, f, v) => nmField(t, f, v),
+    sysKey: (t, k) => { if (t.os.term && t.os.term.mode === 'nmtui') return nmKey(t, k); if (k === 'Enter') OSI.term.enter(t); else if (k === 'Up' || k === 'Down') OSI.term.histMove(t, k === 'Up' ? -1 : 1); }, sysKeyBar: [] };
 };
