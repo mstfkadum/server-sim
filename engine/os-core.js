@@ -85,7 +85,7 @@ OSI.mount = (t, f) => {
 };
 OSI.eject = t => {
   const s = osSt(t); if (!s.media) return say('info', 'Nothing to eject: no image is on the virtual CD.');
-  if (s.scr === 'inst' && s.inst && !s.inst.done) return say('warn', 'Not now: the installer is still reading from the image. Eject it once the installation is complete.');
+  if (s.scr === 'inst' && s.inst && !s.inst.done && !OSI.newSys(t)) return say('warn', 'Not now: the installer is still reading from the image. Eject it once the installation is complete.');
   const f = s.media; s.media = null;
   say('ok', `${f} ejected: the virtual CD/DVD-ROM is empty.${OSI.newSys(t) ? ' The server now boots only from its own disk.' : ''}`);
 };
@@ -109,20 +109,26 @@ CORE.osDlg = a => {
 OSI.openDialog = (t, o = {}) => { const s = osSt(t); s.dlg = Object.assign({ mount: true }, o); s.pick = s.media || null; };
 
 /* ---- booting ---- */
-// the firmware's boot entries, in boot order: the installed OS, then the virtual CD with an image on it
+// the configured boot order of the two devices: 'disk' (the boot disk) and 'cd' (the virtual CD). Default: disk first,
+// so the virtual CD boots by itself only when the disk has no system. A pack may let the student change it (s.order).
+OSI.order = t => (t.os && t.os.order) || ['disk', 'cd'];
+OSI.setOrder = (t, o) => { osSt(t).order = o.slice(); };
+// the firmware's boot entries, in boot order: the installed OS and the virtual CD with an image on it
 OSI.bootList = t => {
-  const s = osSt(t), h = osH(), L = [];
-  if (s.sys) L.push({ id: 'disk', label: h.entry(s.sys.os === 'old' ? h.old.entry : OS_META[s.sys.os].entry), os: true });
-  if (s.media) L.push({ id: 'cd', label: h.cdLabel });
-  return L;
+  const s = osSt(t), h = osH(), E = {};
+  if (s.sys) E.disk = { id: 'disk', label: h.entry(s.sys.os === 'old' ? h.old.entry : OS_META[s.sys.os].entry), os: true };
+  if (s.media) E.cd = { id: 'cd', label: h.cdLabel };
+  return OSI.order(t).map(k => E[k]).filter(Boolean);
 };
+// what starts after POST: the one-time boot (next) if set, otherwise the first bootable device in the boot order
+const osFromCd = (t, next) => { const s = osSt(t); if (!s.media || next === 'disk') return false; if (next === 'cd' || !s.sys) return true; const o = OSI.order(t); return o.indexOf('cd') < o.indexOf('disk'); };
 OSI.pickBoot = (t, id) => { const s = osSt(t); s.next = id; if (id === 'cd') s.m.f11 = true; };
 OSI.reset = t => { const s = osSt(t); if (s.media && (!s.sys || s.sys.os === 'old' || !s.m.cd)) s.m.reset = true; s.scr = null; s.inst = s.inst && s.inst.done ? s.inst : null; if (s.term) s.term.mode = 'boot'; };
 // the firmware hands over after POST: 'osi' (this module draws the screen), 'old' (the pack's own screen for the
 // previous OS) or 'none' (no bootable device)
 OSI.boot = t => {
   const s = osSt(t), next = s.next; s.next = null;
-  if (s.media && (next === 'cd' || (!s.sys && next !== 'disk'))) {
+  if (osFromCd(t, next)) {
     s.cdBoots++; s.m.cd = true; s.at = osNow();
     if (OSI.whyNot(t, s.media)) { s.scr = 'bad'; return 'osi'; }
     s.scr = 'inst'; s.inst = OSI.kinds[s.wo].fresh(t); return 'osi';
@@ -131,7 +137,7 @@ OSI.boot = t => {
   if (s.sys.os === 'old') return 'old';
   s.scr = 'sys'; s.at = osNow(); OSI.kinds[s.sys.os].boot(t); return 'osi';
 };
-OSI.peek = t => { const s = t.os; if (!s) return null; if (s.media && (s.next === 'cd' || (!s.sys && s.next !== 'disk'))) return 'cd'; return s.sys ? 'disk' : 'none'; };
+OSI.peek = t => { const s = t.os; if (!s) return null; if (osFromCd(t, s.next)) return 'cd'; return s.sys ? 'disk' : 'none'; };
 OSI.down = t => { const s = osSt(t); s.scr = null; };
 // what the screen shows now, and the keys to send
 OSI.active = t => !!(t.os && t.os.scr);
@@ -163,7 +169,7 @@ CORE.osEnter = () => { if (T.os) OSI.term.enter(T); };
 // Enter in a field of an installer or the DCUI: the screen's Enter (OK, Continue)
 CORE.osKeyEnter = () => { if (T.os && T.os.scr) OSI.key(T, 'Enter'); };
 // focus: the console's input (the shell, a login prompt) gets the keyboard
-OSI.focus = () => { const ae = document.activeElement; if (ae && ae.matches && ae.matches('input:not(.osin), textarea')) return; const el = document.querySelector('#stage .osx input.osin.focus') || document.querySelector('#stage .osx input.osin'); if (el && ae !== el) { el.focus({ preventScroll: true }); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (e) { } } };
+OSI.focus = () => { const ae = document.activeElement; if (ae && ae.matches && ae.matches('input:not(.osin), textarea')) return; const el = document.querySelector('#stage .osx input.osin.focus') || (document.querySelector('#stage .osx.nmt') ? null : document.querySelector('#stage .osx input.osin')); if (el && ae !== el) { el.focus({ preventScroll: true }); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (e) { } } };
 
 /* ---- a wrong image on the virtual CD: what the firmware or the image shows ---- */
 function osBadScreen(t) {
@@ -253,6 +259,18 @@ OSI.init = (t, os, old) => { t.os = OSI.fresh(os, old); t.os.ref = `OS-${{ ubunt
 .lc{background:#000;color:#C8C8C8;padding:${U(6)} ${U(10)}}
 .osx .lcl{white-space:pre-wrap;word-break:break-all}
 .osx .lin{display:flex;white-space:pre}.osx .lin input{flex:1}
+.nmt{background:#1A3E8C;color:#000;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.nmt .nmwin{background:#C4C4C4;color:#000;border:${U(2)} solid #F0F0F0;box-shadow:${U(8)} ${U(8)} 0 #000;padding:${U(8)} ${U(22)} ${U(14)};min-width:${U(420)}}.nmt .nmwin.wide{min-width:${U(720)}}
+.nmt .nmti{text-align:center;margin:${U(-8)} 0 ${U(10)}}.nmt .nmti{color:#000;font-weight:700}
+.nmt .nmt0{text-align:center;margin:${U(4)} 0 ${U(12)}}
+.nmt .nmlist{display:flex;flex-direction:column;margin:0 auto ${U(12)};width:max-content;min-width:${U(260)}}.nmt .nmlist.box{border:${U(1)} solid #000;padding:${U(4)} ${U(8)};min-height:${U(180)};min-width:${U(300)}}
+.nmt .nmhd{font-weight:700}.nmt .nmcol{display:flex;gap:${U(24)};align-items:flex-start}.nmt .nmside{display:flex;flex-direction:column;gap:${U(10)}}
+.nmt .nmr{display:block;padding:0 ${U(6)}!important;white-space:pre}.nmt .nmr.cur{background:#8A8A8A}.nmt .on{background:#B01818!important;color:#FFF!important}
+.nmt .nmb{white-space:pre}.nmt .nmbtns{display:flex;justify-content:center;gap:${U(24)};margin-top:${U(10)}}.nmt .nmbtns.r{justify-content:flex-end}
+.nmt .nmf{display:flex;white-space:pre;margin:${U(2)} 0}.nmt .nmf .nml{flex:none}.nmt .nmf input.osin{flex:1;background:#E6E6E6!important;color:#000;padding:0 ${U(4)}!important;min-width:${U(300)}}.nmt .nmf.on{background:none!important}.nmt .nmf.on input.osin{background:#FFF!important;outline:${U(2)} solid #B01818}
+.nmt .nmsec{margin:${U(6)} 0 ${U(2)};white-space:pre}.nmt .nmc{display:block;margin:${U(4)} 0;white-space:pre}
+.nmt .nmerr{margin-top:${U(14)};background:#C4C4C4;color:#B01818;border:${U(2)} solid #F0F0F0;padding:${U(4)} ${U(12)};max-width:${U(820)};white-space:normal}
+.nmt .nmkeys{position:absolute;bottom:${U(8)};left:0;right:0;text-align:center;color:#C8D4F0;font-size:${U(13)}}
 .osx .ent{color:#888;margin-left:${U(8)};border:${U(1)} solid #555!important;padding:0 ${U(6)}!important;font-size:${U(12)}!important}
 .osfd{position:absolute;inset:0;z-index:9;background:rgba(10,14,18,.5);display:flex;align-items:flex-start;justify-content:center;padding:40px 10px}
 .osfw{width:min(640px,100%);background:#FFF;color:#1C2226;border:1px solid #8A949B;box-shadow:0 12px 34px rgba(0,0,0,.5);font:13px/1.4 var(--font)}

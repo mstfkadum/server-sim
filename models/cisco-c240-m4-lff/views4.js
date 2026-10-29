@@ -197,7 +197,7 @@ Sim.registerView({
   tray(t) {
     return `<h2>Work order: management setup</h2><table class="dec"><tr><td>NIC mode</td><td>Dedicated</td></tr><tr><td>NIC redundancy</td><td>None</td></tr><tr><td>DHCP</td><td>Disabled</td></tr><tr><td>CIMC IP</td><td>${WO.ip}</td></tr><tr><td>Prefix/Subnet</td><td>${WO.mask} (/24)</td></tr><tr><td>Gateway</td><td>${WO.gw}</td></tr><tr><td>User name</td><td>${WO.user}</td></tr><tr><td>Password</td><td>${WO.pw}</td></tr></table>
       <h3>Procedure</h3><ol class="rules" style="padding-left:20px"><li>Power cords in: the power LED is amber (standby)</li><li>Plug a VGA monitor and a USB keyboard into the rear panel</li><li>Press the front power button (Cisco's guide says press and hold it for four seconds)</li><li>When the screen offers &lt;F8&gt;Cisco IMC Configuration, press F8</li><li>Page 1: NIC mode, NIC redundancy, untick DHCP, then CIMC IP, Prefix/Subnet and Gateway</li><li>F1 for page 2: type the default (admin) password twice</li><li>F5, then wait for "Network settings configured" (about 45 seconds on a real server)</li><li>F10 saves and reboots</li><li>Check the new IP on the boot screen, then unplug the monitor and keyboard</li><li>Check the result from a browser (Management view)</li></ol>
-      <h3>Keys</h3><ul class="rules"><li>Up and Down move between fields; Space ticks a box</li><li>In a text field, type the value directly</li><li>F1 and F2 switch pages; Esc leaves without saving</li><li>Your own keyboard works while this view is open. On a touch screen, use the keys below the monitor</li></ul>
+      <h3>Keys</h3><ul class="rules"><li>Up and Down, or Tab and Shift+Tab, move between fields; Space ticks a box</li><li>In a text field, type the value directly</li><li>F1 and F2 switch pages; Esc leaves without saving</li><li>Your own keyboard works while this view is open. On a touch screen, use the keys below the monitor</li></ul>
       <h3>About these screens</h3><p class="cap" style="font-size:13px">The boot and utility screens are rebuilt from your video; timings are shortened. The rear photo is yours, cleaned: background removed, straightened, empty slots darkened. In the unplugged view the VGA port is drawn in, and the keyboard plug is drawn.</p>`;
   }
 });
@@ -291,12 +291,16 @@ Sim.every(() => {
   else if (osScreenOn(T)) OSI.focus();
 }, 250);
 Sim.listen('keydown', e => {
-  const kvm = Sim.view === 'cimc' && T.cimc.kvm && e.target && e.target.closest && e.target.closest('.kvm');
+  // through the KVM: keys typed with focus in the console window, or nowhere in particular (after a click or a redraw)
+  const tg0 = e.target, free = !tg0 || tg0 === document.body || tg0 === document.documentElement;
+  const kvm = Sim.view === 'cimc' && T.cimc.kvm && (free || (tg0.closest && tg0.closest('.kvm')));
   if (Sim.view !== 'console' && !kvm) return;
   const map = { F1: 'F1', F2: 'F2', F5: 'F5', F6: 'F6', F8: 'F8', F10: 'F10', Escape: 'Esc', ArrowUp: 'Up', ArrowDown: 'Down' };
   const tg = e.target, inF8 = tg && tg.matches && tg.matches('input.f8in'), onBtn = tg && tg.matches && tg.matches('button, select, a, .hot'), inOs = tg && tg.matches && tg.matches('input.osin');
   let k = map[e.key];
   if (inOs && (k === 'Up' || k === 'Down')) k = null;
+  // Tab and Shift+Tab move between the fields of the F8 utility and the items of the F6 boot menu, like Down and Up
+  if (e.key === 'Tab' && !e.altKey && !e.ctrlKey && !e.metaKey && ['f8', 'bmenu'].includes(conPhase(T))) k = e.shiftKey ? 'Up' : 'Down';
   if (osScreenOn(T) && (!k || k === 'Esc')) { const o = OSI.mapKey(e); if (o && (!inOs || /^(Alt)?F\d+$|^Esc$/.test(o))) k = o; }
   if (kvm) { if (!k && e.key === 'Enter' && !onBtn && !inOs) k = 'Enter'; if (!k) return; e.preventDefault(); e.stopImmediatePropagation(); Sim.do('kvmKey', k); return; }
   if (!k && e.key === 'Enter' && !onBtn) k = 'Enter';

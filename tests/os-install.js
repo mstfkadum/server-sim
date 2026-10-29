@@ -99,7 +99,57 @@ const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '.
   o = await sh('esxcli network nic list'); ok(/vmnic0\s+0000:01:00\.0\s+igbn\s+Up\s+Down/.test(o) && /vmnic2\s+0000:0a:00\.0\s+nenic\s+Up\s+Up\s+10000/.test(o), 'esxcli network nic list: LAN 1 down, VIC PORT 1 up at 10 Gb/s');
   o = await sh('vmkping -c 3 10.1.40.1'); ok(/3 packets received, 0% packet loss/.test(o), 'vmkping: the gateway answers');
 
-  // 9. no OS lab: virtual media is not used, nothing breaks
+  o = await sh('nmtui'); ok(/-sh: nmtui: not found/.test(o), 'ESXi Shell: no nmtui');
+
+  // 9. the shell's keys: Up and Down walk the history, Ctrl+L clears the screen (Rocky on the Cisco, real key presses)
+  await lab(C, 'os-rocky');
+  ok(await until('!!t.os.ran.login'), 'Rocky installed and logged in');
+  const cmdIn = () => p.locator('#stage input.osin[data-field="os.cmd"]');
+  const typed = async c => { await cmdIn().click(); await cmdIn().fill(c); await p.keyboard.press('Enter'); await p.waitForTimeout(100); };
+  await typed('hostname'); await typed('uname -r'); await typed('uname -r'); await typed('lsmem');
+  ok((await T('t => t.os.term.hist.join("|")')) === 'hostname|uname -r|lsmem', 'history: every command once in a row (ignoredups)');
+  await cmdIn().click(); await p.keyboard.type('ip'); await p.keyboard.press('ArrowUp'); await p.waitForTimeout(80);
+  ok(await cmdIn().inputValue() === 'lsmem', 'Up: the last command');
+  for (let k = 0; k < 4; k++) await p.keyboard.press('ArrowUp'); await p.waitForTimeout(80);
+  ok(await cmdIn().inputValue() === 'hostname', 'Up stops at the oldest command');
+  for (let k = 0; k < 3; k++) await p.keyboard.press('ArrowDown'); await p.waitForTimeout(80);
+  ok(await cmdIn().inputValue() === 'ip', 'Down past the newest gives back the line being typed');
+  await p.keyboard.press('Control+l'); await p.waitForTimeout(80);
+  ok((await p.evaluate(() => OSI.term.out(twin()).length)) === 0 && await cmdIn().inputValue() === 'ip', 'Ctrl+L clears the screen, the typed line stays');
+
+  // 10. nmtui on Rocky: edit the profile (saved, not live), reactivate (live), hostname; nmcli con down/up
+  const ifc = await T('t => ({ i: t.os.sys.iface, a: t.os.sys.addr })'); e0 = await T('t => t.errors');
+  await typed('nmtui'); ok(await p.locator('#stage .osx.nmt').count() === 1, 'nmtui opens');
+  await p.keyboard.press('Enter'); await p.waitForTimeout(80); ok((await T('t => t.os.term.nm.s')) === 'list', 'Edit a connection: the list of profiles');
+  for (let k = 0; k < 6 && (await T('t => t.os.term.nm.row')) !== ifc.i; k++) await p.keyboard.press('Tab');
+  await p.keyboard.press('Enter'); await p.waitForTimeout(80);
+  r = await T('t => t.os.term.nm'); ok(r.s === 'edit' && r.f.method === 'manual' && r.f.addr === ifc.a + '/24', `${ifc.i}: Manual, ${r.f.addr}`);
+  await p.keyboard.press('Tab'); await p.waitForTimeout(80); await p.locator('#stage input.osin[data-field="os.nm.addr"]').fill('10.1.40.150/24');
+  await p.locator('#stage .nmt button', { hasText: '<OK>' }).click(); await p.waitForTimeout(80);
+  ok((await T('t => t.os.sys.nmp[t.os.sys.iface].addr')) === '10.1.40.150/24' && (await T('t => t.os.sys.addr')) === ifc.a, 'OK saves the profile; the port keeps its address until reactivated');
+  await p.keyboard.press('Escape'); await p.keyboard.press('ArrowDown'); await p.keyboard.press('Enter'); await p.waitForTimeout(80);
+  await p.locator('#stage .nmt .nmr', { hasText: ifc.i }).click(); await p.locator('#stage .nmt button', { hasText: 'Deactivate' }).click(); await p.locator('#stage .nmt button', { hasText: '<Activate>' }).click();
+  ok((await T('t => t.os.sys.addr')) === '10.1.40.150', 'Deactivate, Activate: the new address is live');
+  await p.locator('#stage .nmt button', { hasText: 'Back' }).click(); await p.locator('#stage .nmt .nmr', { hasText: 'Set system hostname' }).click();
+  await p.locator('#stage input.osin[data-field="os.nm.host"]').fill('c240-new'); await p.locator('#stage .nmt button', { hasText: '<OK>' }).click();
+  await p.locator('#stage .nmt button', { hasText: '<OK>' }).click(); await p.locator('#stage .nmt .nmr', { hasText: 'Quit' }).click(); await p.waitForTimeout(80);
+  ok((await T('t => t.os.sys.host + "," + t.os.term.mode')) === 'c240-new,sh', 'hostname set, Quit back to the shell');
+  o = await sh('ip -br a'); ok(new RegExp(`${ifc.i}\\s+UP\\s+10\\.1\\.40\\.150/24`).test(o), 'ip -br a: the new address');
+  o = await sh('nmcli con down ' + ifc.i); o = await sh('ip -br a'); ok(!/10\.1\.40\.150/.test(o.split('ip -br a').pop()), 'nmcli con down: no address');
+  o = await sh('nmcli con up ' + ifc.i); ok(/successfully activated/.test(o), 'nmcli con up');
+  ok((await T('t => t.errors')) === e0, 'nmtui and nmcli count no mistakes');
+  await lab(C, 'os-ubuntu'); ok(await until('!!t.os.ran.login'), 'Ubuntu installed and logged in');
+  o = await sh('nmtui'); ok(/Command 'nmtui' not found/.test(o) && /netplan/.test(o), 'Ubuntu Server: nmtui not installed, netplan named');
+
+  // 11. Cisco IMC boot order: the virtual DVD first; a plain restart boots the installer, no F6
+  await lab(C, 'os-rocky'); ok(await until('t.os.media === OSI.want(t)'), 'Rocky image mapped');
+  await p.evaluate(() => { const c = twin().cimc; c.kvm = false; c.menu = true; Sim.do('cimcNav', 'compute'); Sim.do('cimcBoOpen', ''); Sim.do('cimcBoSel', 'cd'); Sim.do('cimcBoMove', 'up'); Sim.do('cimcBoSave', ''); });
+  ok((await T('t => OSI.order(t).join() + "," + OSI.bootList(t)[0].id')) === 'cd,disk,cd', 'boot order saved, vDVD first in the boot list');
+  await p.evaluate(() => { Sim.do('cimcKvm', ''); Sim.do('kvmPower', 'reset'); });
+  for (let k = 0; k < 80 && !(await T('t => t.os.scr')); k++) await p.waitForTimeout(500);
+  ok((await T('t => t.os.scr + "," + !!t.con.f6')) === 'inst,false', 'Reset without F6 boots the installer from the boot order');
+
+  // 12. no OS lab: virtual media is not used, nothing breaks
   await lab(H, 'cpurep');
   await p.evaluate(() => { Sim.do('go', 'handover'); });
   r = await T("t => !!t.os"); ok(!r, 'other labs carry no OS state');

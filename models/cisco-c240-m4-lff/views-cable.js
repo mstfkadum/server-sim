@@ -80,6 +80,7 @@ function arm(t) {
   if (!r.laid) r.laid = r.routed ? { psu1: true, psu2: true, vic1: true, vic2: true, mgmt: true } : {};
   if (!r.straps) r.straps = r.routed ? { exit: true, elbow: true } : { exit: false, elbow: false };
   if (!r.dest) r.dest = {};
+  if (r.kit === undefined) r.kit = !!(r.tabs.outer || r.tabs.inner || r.tabs.slider);   // the arm taken from the parts cart
   return r;
 }
 const cmaReady = t => { const r = arm(t); return !!(r.tabs.outer && r.tabs.inner && r.tabs.slider); };
@@ -494,7 +495,7 @@ function rearScene(t) {
       CG.outB.forEach((s, i) => { a += basketFront(t, false, s, CG.inB.length + i); });
       a += strapSvg(t, 'elbow') + strapSvg(t, 'exit') + tabSvg('outer', r.tabs.outer);
       if (ghost) a = `<g opacity=".38">${a}</g>`;
-    } else a += cmaGhost();
+    } else if (r.kit) a += cmaGhost();
     g += a;
     keys.forEach(k => { if (mode(k) === 'laid' || mode(k) === 'dangle') g += cabSec(t, k, mode(k), 'E', -70); });
   }
@@ -523,21 +524,36 @@ function rearScene(t) {
     if (r.labeled && !CVA) g += labelsSvg(t, modes);
   }
   if (bench) g += `<rect x="300" y="300" width="460" height="64" rx="8" fill="#14202B" stroke="#F0A93B"/><text x="530" y="328" text-anchor="middle" class="st">The server is on the bench</text><text x="530" y="348" text-anchor="middle" class="ss">Rack it (Rack mounting) before you cable it</text>`;
-  if (!bench) g += tabTargets(t) + portTags(t);
+  if (!bench) g += tabTargets(t) + strapTags(t) + portTags(t);
   g += sceneLabels(t);
   CVA = null;
   return g;
 }
+// the two hook-and-loop straps, once cables lie in the arm: where each one is and whether it is fastened (state, not guidance)
+function strapTags(t) {
+  const r = arm(t); if (!cmaReady(t) || !Object.keys(r.laid).some(k => r.laid[k])) return '';
+  const A = armAt(cvD);
+  let g = '';
+  ['exit', 'elbow'].forEach(k => {
+    const s = CG.strap[k], on = r.straps[k], [px, py] = P3(onOut(A, s, -16, on ? 52 : 92)), col = on ? '#45D07F' : '#FFB52E';
+    // the label sits below the strap's click zone (which ends 118 mm down), so a guidance ring round the strap never crosses it
+    const [lx, ly] = P3(onOut(A, s + (k === 'exit' ? -6 : 6), -16, 131));
+    g += `<g pointer-events="none"><rect x="${f2(px - 14)}" y="${f2(py - 30)}" width="28" height="${on ? 48 : 64}" rx="6" fill="none" stroke="${col}" stroke-width="2.2"${on ? '' : ' stroke-dasharray="5 3"'}/>`
+      + `<text x="${f2(lx)}" y="${f2(ly)}" text-anchor="${k === 'exit' ? 'start' : 'end'}" style="font:700 11px var(--font);fill:${col};paint-order:stroke;stroke:#0A0E12;stroke-width:3px">Strap: ${on ? 'fastened' : 'open, wrap the bundle'}</text></g>`;
+  });
+  return g;
+}
 // the arm in its box position before any tab is on: a dashed outline where it will go
 function tabTargets(t) {
-  const r = arm(t); if (cmaReady(t)) return '';
+  const r = arm(t); if (cmaReady(t) || !r.kit) return '';
   let g = '';
   [['outer', 1, CG.O[0] + 3, 88, CG.O[1] - 6, 'outer rail'], ['inner', 2, CG.I0[0] + 3, 57, CG.I0[1] + cvD - 2, 'inner rail'], ['slider', 3, CG.SR[0] - 8, 79, CG.SR[1] - 6, 'slider']].forEach(([k, n, x, y, z, nm]) => {
     if (r.tabs[k]) return;
     const [px, py] = cwp(x, y, z);
-    // the numbered targets are guidance: with it off, only the part names stay
-    if (Sim.guide) g += `<circle cx="${f2(px)}" cy="${f2(py)}" r="11" fill="#14202B" stroke="#FFB52E" stroke-width="2" stroke-dasharray="4 3"/><text x="${f2(px)}" y="${f2(py + 4)}" text-anchor="middle" style="font:800 11px var(--font);fill:#FFD27A">${n}</text>`;
-    g += `<text x="${f2(px + (k === 'slider' ? -16 : 16))}" y="${f2(py + 4)}" text-anchor="${k === 'slider' ? 'end' : 'start'}" style="font:700 10px var(--font);fill:#FFD27A;paint-order:stroke;stroke:#0A0E12;stroke-width:3px">${nm}</text>`;
+    // every mount point is marked, guidance on or off; the order number is guidance
+    g += `<circle cx="${f2(px)}" cy="${f2(py)}" r="11" fill="#14202B" fill-opacity=".85" stroke="#FFB52E" stroke-width="2" stroke-dasharray="4 3" pointer-events="none"/>`;
+    if (Sim.guide) g += `<text x="${f2(px)}" y="${f2(py + 4)}" text-anchor="middle" pointer-events="none" style="font:800 11px var(--font);fill:#FFD27A">${n}</text>`;
+    g += `<text x="${f2(px + (k === 'slider' ? -30 : 30))}" y="${f2(py + 4)}" text-anchor="${k === 'slider' ? 'end' : 'start'}" pointer-events="none" style="font:700 11px var(--font);fill:#FFD27A;paint-order:stroke;stroke:#0A0E12;stroke-width:3px">${nm} tab</text>`;
   });
   return g;
 }
@@ -780,15 +796,22 @@ Sim.registerView({
   tray(t) {
     const u = t.rack.u || 0, loc = `DC1-R12-U${String(u).padStart(2, '0')}`;
     const rows = Object.keys(PORTS).filter(k => t.cables[k]).map(k => `<div class="dimmlabel" style="font-size:12px">${loc}-SRV01 | ${PORTS[k][4]} &harr; ${destTag(t.cables[k], cabN(t, k))} | ${ROLE[k]}</div>`).join('');
-    return `<h2>Cabling notes</h2><img class="photo" alt="Photo of a cable management arm behind a server" src="${IMG.cma}"><p class="cap">A cable management arm seen from above, the server slid out: the cables ride in the guides along both arms and round the elbow (slide 30).</p>
+    const r = arm(t), cart = r.kit || r.pos === 'bench' ? '' : `<h2>Parts cart</h2><div class="item"><span>Cable management arm<small style="font-family:var(--mono)">${PROFILE.cma}</small><small>For the C240 M4: inner arm, outer arm, elbow, width-adjustment slider</small></span>${button('Take the arm', 'cmaKit')}</div>`;
+    return cart + `<h2>Cabling notes</h2><img class="photo" alt="Photo of a cable management arm behind a server" src="${IMG.cma}"><p class="cap">A cable management arm seen from above, the server slid out: the cables ride in the guides along both arms and round the elbow (slide 30).</p>
       <h3>Fitting the arm (Cisco UCSC-CMAF-M4)</h3><ol class="rules" style="padding-left:20px"><li>Server pushed fully in</li><li>Outer arm's tab onto the end of the fixed outer rail, until it clicks</li><li>Inner arm's tab onto the end of the server's inner rail, until it clicks</li><li>Pull out the width-adjustment slider to the rack's width; its tab onto the opposite outer rail</li><li>Open the hinged flap on each guide, lay the cables in, close each flap</li></ol>
       <ul class="rules"><li>Power: black IEC C13 to C14 cords, PSU 1 to PDU A outlet 7 and PSU 2 to PDU B outlet 7: redundant as 1+1</li><li>Data: SFP-10G-SR optics in the VIC's PORT 1 and PORT 2 (riser 2, slot 5), orange LC duplex multimode fibre: PORT 1 to SW01 port 23 (Eth1/23), PORT 2 to SW02 port 23 (Eth1/23). Twinax (DAC) cables also fit SFP+ ports; RJ-45 does not</li><li>MGMT (M): Cat 6 patch cord to MGT01 port 12 (Gi0/12), for Cisco IMC</li><li>Ports already in use by other systems: SW01 and SW02 ports 1 to 6, 17 and 18; MGT01 ports 1 to 8; PDU outlets 9 to 11</li><li>LAN 1 and LAN 2, the onboard 1 Gb ports, are not used for data in this build</li><li>Controlled slack: a loose loop at the elbow, nothing hanging below the arm</li><li>Labels name both endpoints: location, source, destination, role</li></ul>` +
       (t.rack.labeled && rows ? `<h3>Labels fitted (slide 33 format)</h3>${rows}` : '');
   }
 });
+Sim.on('cmaKit', () => {
+  const r = arm(T); if (r.kit) return;
+  if (r.pos === 'bench') return bad('Rack the server first. The arm fits on the ends of the slide rails.');
+  r.kit = true; say('ok', `Cable management arm taken from the cart: ${PROFILE.cma}, the arm for this server. Its three tabs are marked on the rails: outer rail, inner rail, then the width-adjustment slider.`);
+});
 Sim.on('cmaTab', k => {
   const r = arm(T);
   if (r.pos === 'bench') return bad('Rack the server first. The arm fits on the ends of the slide rails.');
+  if (!r.kit) return bad('Take the cable management arm from the parts cart first (Parts panel).');
   if (r.pos !== 'in') return bad('Push the server fully into the rack first: the arm goes on with the server in.');
   if (!['outer', 'inner', 'slider'].includes(k) || r.tabs[k]) return;
   if (k === 'inner' && !r.tabs.outer) return bad('Start with the arm farthest from the server: slide its tab onto the end of the left outer slide rail, the fixed one, until it clicks.');

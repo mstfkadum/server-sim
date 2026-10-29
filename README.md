@@ -8,7 +8,9 @@ Models: Cisco UCS C240 M4 LFF (thirteen labs: eight hands-on labs, the two RAM D
 DIMM models, 16 GB RDIMM, 32 GB RDIMM or 64 GB LRDIMM, and fits as many as they like in Cisco's order, minimum 2 DIMMs (A1 and E1),
 checked on a population map and read back in Cisco IMC, Chassis, Inventory, Memory; the cabling follows a cable schedule
 with exact ports: VIC PORT 1 and PORT 2 to SW01 and SW02 port 23, MGMT to MGT01 port 12, PSU 1 and PSU 2 to PDU A and
-PDU B outlet 7, and a cable in any other port is flagged, left without a link and must be moved) and HPE ProLiant DL380 Gen11 SFF (seven labs; HPE Lab 1 is the new build: find the
+PDU B outlet 7, and a cable in any other port is flagged, left without a link and must be moved; the cable management
+arm UCSC-CMAF-M4 is taken from the parts cart first, then its three tabs go on the marked rail ends, and the two
+hook-and-loop straps show open or fastened, guidance on or off) and HPE ProLiant DL380 Gen11 SFF (seven labs; HPE Lab 1 is the new build: find the
 server by its serial number among three DL380 Gen11 servers in a different order each run (the serial number pull tab on the
 left rack ear of each one against the work order; all three slide out, and extending the wrong one counts as a mistake), extend it
 from the rack, processor 2 (the same hands-on flow as the replacement lab, for a new processor and a new heatsink: the
@@ -88,14 +90,19 @@ a server that is already built and runs an older system, which is why the one-ti
   Drives, Image File CD/DVD-ROM) or the Cisco IMC KVM console (Virtual Media, Map CD/DVD). The folder also holds
   look-alike wrong images (the Ubuntu desktop image, the Rocky Linux boot and ARM images, VMware's generic ESXi image
   instead of the vendor's custom one); mapping one is a mistake.
-- **One-time boot:** F11 at POST on HPE (One-Time Boot Menu), F6 on Cisco (Boot Menu).
+- **One-time boot:** F11 at POST on HPE (One-Time Boot Menu), F6 on Cisco (Boot Menu). On the Cisco the boot order can also be set in Cisco IMC
+  (Compute, BIOS, Configure Boot Order): with the virtual DVD first, every restart boots the mapped image without F6,
+  including the restart after the install, until the image is unmapped or the HDD is put first again.
 - **Installers** modelled on the real ones: Ubuntu's Subiquity, Rocky's Anaconda, the ESXi installer and DCUI. Each
   has the traps engineers hit: the data volume offered before the boot device (HPE: the RAID 6 volume next to the
   NS204i-u), a static address on the port that has a link (no DHCP on the data network), and on the Cisco, ESXi's
   management network on the onboard port with no cable, to move to the VIC port.
 - **After the install:** eject the image, log in at the console and check the build from the OS: `lsmem`, `free`,
   `dmidecode -t memory`, `lscpu`, `lsblk`, `ip`, `ethtool`, `ping` and more on Linux (`help` lists them), `esxcli` in
-  the ESXi Shell. Every answer comes from what the student built in the trainer: the DIMMs fitted, the processors,
+  the ESXi Shell. The Linux console keeps a command history (Up and Down) and clears with `clear` or Ctrl+L. On
+  Rocky Linux, `nmtui` edits the port's connection profile (Manual or Automatic, address with prefix, gateway, DNS),
+  activates or deactivates connections and sets the hostname; as in NetworkManager, a saved profile applies when the
+  connection is activated again (or `nmcli con up`). Ubuntu Server has no `nmtui`: it uses netplan. Every answer comes from what the student built in the trainer: the DIMMs fitted, the processors,
   the RAID volume, the cabled ports. Then the new boot entry is read back in iLO (Administration, Boot Order) or Cisco
   IMC (Compute, BIOS), and the handover records memory, logical CPUs and boot disk as the OS reports them.
 

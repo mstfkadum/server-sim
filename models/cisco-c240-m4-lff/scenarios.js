@@ -203,7 +203,7 @@ function MGMT() { return [
   { view: 'cimc', text: 'Accept the certificate warning for the controller', hint: 'Cisco IMC uses a self-signed certificate. Continue only if the address matches the work order.', done: t => !!t.cimc.certOk[WO.ip], cue: urlCue },
   { view: 'cimc', text: `Log in with the account set from the console: ${WO.user} / ${WO.pw}`, done: t => t.cimc.consoleLogin, cue: loginCue },
   { view: 'cimc', text: 'Verify the settings under Admin, Networking against the work order', done: t => t.cimc.verified,
-    cue: t => navCue(t, 'network') || C('cimcVerify', '', 'Compare each value on screen with the work order in the panel on the right, then confirm.') },
+    cue: t => navCue(t, 'network') || C('cimcVerify', '', 'Compare each saved value with the work order in the task box under the browser, then confirm.') },
   { view: 'cimc', text: 'Change the admin password to a new strong password', hint: 'Admin, User Management: tick user 1, Modify User, Change Password, type it twice, Save.', done: t => t.cimc.guiPw,
     cue: t => { const c = t.cimc, f = c.form, n = navCue(t, 'users'); if (n) return n;
       if (!c.dlg) return !c.rowSel ? C('cimcRow', '', 'Tick the checkbox for user 1, admin.') : C('cimcModify', '', 'Click Modify User.');
@@ -277,8 +277,8 @@ Sim.registerScenario({
     { view: 'rack', text: 'Fit both slide rails and the inner rails', done: t => t.rack.left && t.rack.right && t.rack.inner,
       cue: t => !t.rack.left ? C('rackRail', 'left', 'Fit the left slide rail in the rack.') : !t.rack.right ? C('rackRail', 'right', 'Fit the right slide rail at the same height.') : C('rackInner', '', 'Attach the inner rails to the sides of the server.') },
     { view: 'rack', text: 'Lift the server into the rails with two people', done: t => t.rack.pos !== 'bench', cue: () => C('rackLift', '', 'Two-person lift: insert the server and push until the slam latches engage.') },
-    { view: 'cable', text: 'Attach the cable management arm', hint: 'Cisco order: the outer arm\'s tab onto the fixed outer rail, the inner arm\'s tab onto the server\'s inner rail, then the width-adjustment slider onto the opposite rail.', done: t => cmaReady(t),
-      cue: t => { const r = arm(t); return !r.tabs.outer ? C('cmaTab', 'outer', 'Start with the arm farthest from the server: slide its tab onto the end of the left outer rail until it clicks.') : !r.tabs.inner ? C('cmaTab', 'inner', 'Now the arm closest to the server: slide its tab onto the end of the inner rail on the server.') : C('cmaTab', 'slider', 'Pull out the width-adjustment slider and slide its tab onto the right outer rail.'); } },
+    { view: 'cable', text: 'Take the cable management arm from the cart and attach it', hint: 'Cisco order: the outer arm\'s tab onto the fixed outer rail, the inner arm\'s tab onto the server\'s inner rail, then the width-adjustment slider onto the opposite rail.', done: t => cmaReady(t),
+      cue: t => { const r = arm(t); return !r.kit ? C('cmaKit', '', 'Take the cable management arm, UCSC-CMAF-M4, from the parts cart.') : !r.tabs.outer ? C('cmaTab', 'outer', 'Start with the arm farthest from the server: slide its tab onto the end of the left outer rail until it clicks.') : !r.tabs.inner ? C('cmaTab', 'inner', 'Now the arm closest to the server: slide its tab onto the end of the inner rail on the server.') : C('cmaTab', 'slider', 'Pull out the width-adjustment slider and slide its tab onto the right outer rail.'); } },
     { view: 'cable', text: PWR_TXT, hint: PWR_HINT, done: cabDone(['psu1', 'psu2']), cue: plugAll(['psu1', 'psu2']) },
     vicCables,
     MGMT_STEP,
