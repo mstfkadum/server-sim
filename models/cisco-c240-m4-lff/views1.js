@@ -394,6 +394,17 @@ const LEV = {
   const U = LEV.u, du = along(U.clip), ud = [235 / 1022, 995 / 1022];
   U.rel = U.clip.map((p, k) => [U.piv[0] + ud[0] * du[k] * 1.04, U.piv[1] + ud[1] * du[k] * 1.04]);
 })();
+/* the marks stamped in the load plate next to each lever's hook (as on the real socket): an arrow toward the lever, a
+   circled 1 and a padlock. Lock-icon lever (left): closes first, padlock shut, arrow to the left. Unlock-icon lever
+   (right): opens first, padlock open, arrow to the right. Photo units; dir -1 = arrow on the left pointing left. */
+const STAMP = { l: [372, 600, -1, true], u: [850, 1230, 1, false] };
+function stampSvg([x, y, dir, shut]) {
+  const ink = (d, w = 7) => `<path d="${d}" fill="none" stroke="#F2F5F7" stroke-width="${w + 4}" stroke-linecap="round" stroke-linejoin="round" transform="translate(2 3)"/><path d="${d}" fill="none" stroke="#2B3136" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const ax = dir * 74, arrow = ink(`M${ax - dir * 42} 0H${ax + dir * 6}M${ax + dir * 6} 0l${-dir * 18} -16M${ax + dir * 6} 0l${-dir * 18} 16`);
+  const one = ink('M0 -26A26 26 0 1 1 -0.1 -26Z', 6) + ink('M-6 -10L3 -15V16M-6 16H11', 6);
+  const lx = -dir * 70, body = ink(`M${lx - 20} -4h40v28h-40Z`, 6), shackle = shut ? ink(`M${lx - 12} -4v-12a12 12 0 0 1 24 0v12`, 6) : ink(`M${lx - 12} -4v-12a12 12 0 0 1 24 0v-6`, 6);
+  return `<g transform="translate(${x} ${y})" pointer-events="none" opacity=".9">${arrow}${one}${body}${shackle}</g>`;
+}
 const ptsStr = pts => pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
 let cpuFx = {};                                                        // recent changes, for animations: key -> {at, from}
 const fxMark = (k, from) => { cpuFx[k] = { at: Date.now(), from }; };
@@ -485,6 +496,7 @@ function sockSvg(t, i) {
       BEADS.slice(0, c.grease).forEach(([x, y], k) => { s += `<ellipse cx="${x + 5}" cy="${y + 6}" rx="44" ry="38" fill="#000" opacity=".18"/><ellipse cx="${x}" cy="${y}" rx="44" ry="38" fill="#9EA6AD" stroke="#6E767D" stroke-width="3"${k === c.grease - 1 && fxAge('gr' + i) < 0.6 ? ' class="drop"' : ''}/><ellipse cx="${x - 12}" cy="${y - 12}" rx="14" ry="10" fill="#E4E8EB" opacity=".8"/>`; });
       if (c.soak) s += `<rect x="${CBOX.ihs[0] + 10}" y="${CBOX.ihs[1] + 10}" width="${CBOX.ihs[2] - CBOX.ihs[0] - 20}" height="${CBOX.ihs[3] - CBOX.ihs[1] - 20}" rx="30" fill="#4AA8FF" opacity=".25"/>`;
     }
+    s += stampSvg(STAMP.l) + stampSvg(STAMP.u);
     s += rodSvg('l', c.lev.l, i) + rodSvg('u', c.lev.u, i);
   }
   if (c.hs) {
