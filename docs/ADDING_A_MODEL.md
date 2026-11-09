@@ -93,6 +93,20 @@ Sim.registerScenario({
 A cue points at what to click next (`{act, arg, say}`) or what to type (`{field, value, say}`); the engine draws the
 "Click here" ring and the step bar from it.
 
+A freehand action (the Dell grease spiral) is a cue with a `drag` path as well: `{act, arg, say, drag: "x,y x,y ..."}`
+in picture coordinates. The ring frames the `act`/`arg` target as usual; `tests/cue-run.js` sends the path as the
+action's argument and `tests/real-click.js` draws it with the mouse. The pack turns pointer strokes into the same call
+(`Sim.listen` on pointer events, then `Sim.do(act, path)`).
+
+A scenario may also give `brief: t => html or null`: while it returns a card, the briefing panel under the work is
+titled Work order and shows that card in place of the intro (the OS install labs use `OSI.brief`, the Dell iDRAC
+setup `idrBrief`), so the student works with the work order in view.
+
+`steps` and `intro` may be getters that read the twin (`T`), for a lab that starts in more than one way: the Dell
+processor lab drops its cable steps when it starts straight after the rack lab. A pack chains one lab into another with
+`Sim.startScenario(id)` from a handler (the Dell rack view's Continue button sets a flag its `setup` reads); a reset
+reloads the lab through the same `setup`, so it can keep the way the lab was started.
+
 **RAM Distributor (optional):** a pack that wants the board and its two labs gives the engine its memory rules with
 `Sim.memRules(rules)`, registers the view with `Sim.registerView(MemPlan.view({ id: 'rdist', title: 'RAM Distributor',
 keep }))`, and builds the practice and exam scenarios with `MemPlan.lab({ id, title, exam, practiceIntro or examIntro,

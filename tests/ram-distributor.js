@@ -24,8 +24,9 @@ const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '.
   });
   for (const m of await p.evaluate(() => Sim.modelOrder)) {
     await p.selectOption('#model', m);
+    if (!await p.evaluate(() => !!REG().mem)) { console.log(`skip ${m}: no RAM Distributor`); continue; }   // a pack without memory rules
     // practice: every processor count and DIMM size, the setup and the placement by the cues, then a correct verify
-    for (const cpus of [1, 2]) for (const part of await p.evaluate(() => REG().mem.parts.map(x => x.key))) {
+    for (const cpus of await p.evaluate(() => Array.from({ length: REG().mem.cpus }, (_, i) => i + 1))) for (const part of await p.evaluate(() => REG().mem.parts.map(x => x.key))) {
       await p.evaluate(([cpus, part]) => { loadScenario('ramdist'); Sim.do('mpCpus', String(cpus)); Sim.do('mpPart', part); }, [cpus, part]);
       const r = await run();
       const res = await p.evaluate(() => { const g = MemPlan.checked(twin()), s = twin().mp; return { gb: s.gb, ok: g && g.ok, errors: twin().errors, title: g ? MemPlan.title(REG().mem, g.goal.slice(0, s.cpus)) : '' }; });
@@ -78,21 +79,37 @@ const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '.
     push('Cisco: CPUs not identical', g(2, 192, [CF(4, ['r32']), CF(4, ['r16'])]), 'fail');
     push('Cisco 512: 16 x 32 GB is as fast but needs more DIMMs', g(2, 512, both(CF(8, ['r32', 'r32']))), 10);
     push('Cisco 1000 GB: 24 x 64 GB is more than needed, and slower (3 per channel)', g(2, 1000, both(CF(12, ['l64', 'l64', 'l64']))), 30);
+    // Dell PowerEdge R6515 (1 CPU, 16 slots A1..A16 = positions 0..15; white tabs 0..7 = 3200 MT/s, black tabs 8..15 = 2933 MT/s)
+    loadModel('dell-poweredge-r6515', 'rackin');
+    const DF = (n, k) => [fill(16, [...Array(n).keys()], k)];
+    push('Dell 256: 8 x 32 GB in A1–A8 (white tabs, 3200 MT/s) is the best', g(1, 256, DF(8, 'r32')), 'best');
+    push('Dell 256: 16 x 16 GB in A1–A16 (2 DPC, 2933 MT/s) is slower', g(1, 256, DF(16, 'r16')), 20);
+    push('Dell 256: 4 x 64 GB in A1–A4 (4 of 8 channels) is slower', g(1, 256, DF(4, 'r64')), 20);
+    push('Dell 1024: 8 x 128 GB LRDIMM in A1–A8 (3200 MT/s) is the best', g(1, 1024, DF(8, 'l128')), 'best');
+    push('Dell 1024: 16 x 64 GB RDIMM in A1–A16 (2 DPC, 2933 MT/s) is slower', g(1, 1024, DF(16, 'r64')), 20);
+    push('Dell 600: 12 x 64 GB (768 GB in A1–A12) is the best balanced >= 600 GB', g(1, 600, DF(12, 'r64')), 'best');
+    push('Dell 2048: 16 x 128 GB LRDIMM in A1–A16 (2 TB max) is the best', g(1, 2048, DF(16, 'l128')), 'best');
+    push('Dell: 6 DIMMs is not a supported balanced count', g(1, 192, DF(6, 'r32')), 'fail');
+    push('Dell: 4 DIMMs in the wrong sockets (A9–A12 black tabs instead of A1–A4)', g(1, 128, [fill(16, [8, 9, 10, 11], 'r32')]), 'fail');
+    push('Dell: mixing RDIMM and LRDIMM (64 GB RDIMM + 128 GB LRDIMM)', g(1, 768, [fill(16, [0, 1, 2, 3], 'r64').map((v, i) => i >= 4 && i < 8 ? 'l128' : v)]), 'fail');
+    push('Dell: mixing capacities (16 GB + 32 GB RDIMM)', g(1, 192, [fill(16, [0, 1, 2, 3], 'r32').map((v, i) => i >= 4 && i < 8 ? 'r16' : v)]), 'fail');
     return out;
   });
   cases.forEach(c => ok(c.exp === 'best' ? c.best : c.exp === 'fail' ? c.fail : !c.fail && c.pen === c.exp, `${c.name}: ${c.fail ? 'fail' : c.best ? 'best' : '-' + c.pen}${c.msg ? ' | ' + c.msg : ''}`));
   // the board in the planner (the RAM Distributor of a lab that is not a RAM lab): the setup, its buttons, the manual
   // placement and the one "next" marker
   for (const m of await p.evaluate(() => Sim.modelOrder)) {
+    if (!await p.evaluate(m => { loadModel(m); return !!REG().mem; }, m)) continue;   // a pack without memory rules
     const r = await p.evaluate(m => {
-      loadModel(m, 'install'); Sim.guide = true; Sim.do('go', 'rdist'); const R = REG().mem, t = twin(), out = {}, n = b => b.flat().filter(Boolean).length;
+      loadModel(m); Sim.guide = true; Sim.do('go', 'rdist'); const R = REG().mem, t = twin(), out = {}, n = b => b.flat().filter(Boolean).length;
+      const cpusList = Array.from({ length: R.cpus }, (_, i) => i + 1), maxC = R.cpus;
       const pick = gb => { const el = document.querySelector('#stage [data-field="mp.sel"]'); el.value = String(gb); el.dispatchEvent(new Event('input', { bubbles: true })); Sim.do('go', 'rdist'); };
       out.slots = document.querySelectorAll('#stage svg [data-act="mpSlot"]').length === R.cpus * R.slots;
       // the memory list: every size offered builds a supported layout with the chosen DIMM, and nothing else is offered
-      out.choices = R.parts.every(p => [1, 2].every(c => { Sim.do('mpCpus', String(c)); Sim.do('mpPart', p.key);
+      out.choices = R.parts.every(p => cpusList.every(c => { Sim.do('mpCpus', String(c)); Sim.do('mpPart', p.key);
         const os = [...document.querySelectorAll('#stage [data-field="mp.sel"] option')].map(o => +o.value).filter(Boolean), ch = MemPlan.choices(R, c, p.key);
-        return os.join() === ch.map(x => x.gb).join() && ch.every(x => !MemPlan.errors(R, [0, 1].map(k => k < c ? R.fill.reduce((mm, pos, i) => { if (i < x.n) mm[pos] = p.key; return mm; }, Array(R.slots).fill(null)) : Array(R.slots).fill(null)), c).length); }));
-      Sim.do('mpCpus', '2'); Sim.do('mpPart', R.parts[1].key); const o = MemPlan.choices(R, 2, R.parts[1].key).find(x => x.n === R.channels); pick(o.gb);
+        return os.join() === ch.map(x => x.gb).join() && ch.every(x => !MemPlan.errors(R, cpusList.map((_, k) => k < c ? R.fill.reduce((mm, pos, i) => { if (i < x.n) mm[pos] = p.key; return mm; }, Array(R.slots).fill(null)) : Array(R.slots).fill(null)), c).length); }));
+      Sim.do('mpCpus', String(maxC)); Sim.do('mpPart', R.parts[1].key); const o = MemPlan.choices(R, maxC, R.parts[1].key).find(x => x.n === R.channels); pick(o.gb);
       out.select = t.mp.gb === o.gb;
       Sim.do('mpDist'); out.dist = JSON.stringify(t.mp.board) === JSON.stringify(MemPlan.target(t));
       Sim.do('mpVerify'); const g = MemPlan.checked(t); out.verify = !!g && g.ok;
@@ -101,7 +118,7 @@ const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '.
       R.fill.slice(0, 2).forEach(pos => Sim.do('mpSlot', `0:${pos}`));
       out.oneNext = (document.querySelector('#stage .mpsvg').innerHTML.match(/stroke-dasharray="7 4"/g) || []).length === 1;
       Sim.do('mpClear'); Sim.do('mpCpus', '1'); out.oneCpu = !!t.mp.gb === MemPlan.choices(R, 1, t.mp.part).some(x => x.gb === o.gb);
-      Sim.do('mpCpus', '2'); pick(o.gb); Sim.do('mpDist'); Sim.do('mpCpus', '1'); out.oneClears = n(t.mp.board.slice(1)) === 0; Sim.do('mpCpus', '2'); Sim.do('mpClear');
+      Sim.do('mpCpus', String(maxC)); pick(o.gb); Sim.do('mpDist'); Sim.do('mpCpus', '1'); out.oneClears = n(t.mp.board.slice(1)) === 0; Sim.do('mpCpus', String(maxC)); Sim.do('mpClear');
       // a random exam: Distribute is off until verified; the best layout placed by hand scores 100
       Sim.do('mpExam'); const w = t.mp.wo; Sim.do('mpDist'); out.examNoDist = !!w && n(t.mp.board) === 0;
       const goal = MemPlan.target(t); goal.forEach((mm, c) => R.fill.forEach(pos => { if (mm[pos]) { Sim.do('mpPart', mm[pos]); Sim.do('mpSlot', `${c}:${pos}`); } }));

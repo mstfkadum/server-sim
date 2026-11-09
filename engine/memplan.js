@@ -204,7 +204,7 @@ const MemPlan = (() => {
   // the map: the slots and the processors in their real places on the board, seen from above, the rear of the server at
   // the top. Click a slot to place the chosen DIMM, click it again to take it out
   const TONE = { blue: ['#2667B8', '#0D2C57', '#FFFFFF'], black: ['#1C2025', '#000000', '#E8EEF2'], white: ['#E4DCC3', '#A99F84', '#14181C'] };
-  const PART = ['#4E5FA6', '#2C7C78', '#8A5A2B'], MK = { ok: '#7CF0A8', part: '#FFC85A', bad: '#FF8A7A' };
+  const PART = ['#4E5FA6', '#2C7C78', '#8A5A2B', '#7A4B8E', '#3B6E8C'], MK = { ok: '#7CF0A8', part: '#FFC85A', bad: '#FF8A7A' };
   function mapSvg(r, t) {
     const s = st(t), k = taskOf(t), b = s.board, q = closed(t), lock = !!(t.rd && t.rd.submitted), lay = r.board.layout;
     const nx = Sim.guide && !q && !t.rd && !t.mpLab ? nextSlot(r, t) : '';
@@ -263,7 +263,7 @@ const MemPlan = (() => {
     const lockAll = !!(d && d.submitted);
     let h = `<div class="mp cueable"><header class="mph"><div><h2>RAM Distributor</h2><p>${esc(r.server)}</p></div>${factsHtml(r, k.cpus)}</header>`;
     h += `<section class="mpbar" aria-label="Setup and actions">
-      <div class="mpgrp"><span>${esc(cpuW(r).replace(/^./, c => c.toUpperCase()))}s</span><div class="mpseg" role="group" aria-label="${esc(cpuW(r))}s installed">${[1, 2].map(n => btn(String(n), 'mpCpus', n, k.cpus === n ? 'on' : '', !!w, ` aria-pressed="${k.cpus === n}"`)).join('')}</div></div>
+      <div class="mpgrp"><span>${esc(cpuW(r).replace(/^./, c => c.toUpperCase()))}s</span><div class="mpseg" role="group" aria-label="${esc(cpuW(r))}s installed">${Array.from({ length: r.cpus }, (_, i) => i + 1).map(n => btn(String(n), 'mpCpus', n, k.cpus === n ? 'on' : '', !!w, ` aria-pressed="${k.cpus === n}"`)).join('')}</div></div>
       <div class="mpgrp"><span>DIMM</span><div class="mpseg" role="group" aria-label="DIMM size">${r.parts.map((p, i) => btn(`${p.cap} GB`, 'mpPart', p.key, `k${i}${s.part === p.key ? ' on' : ''}`, lockAll, ` aria-pressed="${s.part === p.key}" title="${esc(`${p.short}, ${p.pid}`)}"`)).join('')}</div></div>
       ${w ? '' : memSelect(r, s)}
       ${btn('Distribute', 'mpDist', '', 'mpdist', q || (!w && !s.gb))}${btn('Clear Board', 'mpClear', '', '', lockAll)}${d ? '' : btn(s.wo ? 'New Random Exam' : 'Random Exam', 'mpExam', '', 'mpexam')}${!d && s.wo ? btn('Leave the exam', 'mpExamEnd') : ''}${verify}</section>`;
@@ -314,7 +314,7 @@ const MemPlan = (() => {
   const keepGb = (r, s) => { if (s.gb && !choices(r, s.cpus, s.part).some(o => o.gb === s.gb)) s.gb = null; };
   CORE.mpCpus = n => {
     const r = R(), s = st(T); if (woOf(T)) return say('info', 'The work order sets the processors.');
-    s.cpus = +n === 1 ? 1 : 2; if (s.cpus === 1) s.board = [s.board[0]].concat(full(r, []).slice(1));
+    s.cpus = +n === 1 || r.cpus === 1 ? 1 : 2; if (s.cpus === 1) s.board = [s.board[0]].concat(full(r, []).slice(1));
     keepGb(r, s); changed(); say('info', `${pl(s.cpus, cpuW(r))} installed.${s.gb ? '' : ' Choose the memory size.'}`);
   };
   CORE.mpPart = k => {

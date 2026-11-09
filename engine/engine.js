@@ -59,7 +59,9 @@ const runRules = () => Sim.rules.flatMap(r => r(T));
    'card' (a PCIe card seating in its connector), 'riser' (a riser seating in its motherboard socket), 'psu' (a power supply
    locking into its bay), 'latch' (a rack slam latch snapping onto a post). Sim.sound('fans') is the rush of the fans at power-on: they run up to full speed, hold there while
    the server initialises, then slow down and fade out; Sim.soundStop('fans') cuts it short and spins the fans down (the server
-   was shut down or lost power). The header button turns them on or off; the choice stays in this browser. */
+   was shut down or lost power); Sim.sound('fansDown') is a running server's fans spinning down at power-off (it spins down
+   the power-on rush if that is still playing). 'button', 'screw', 'torque', 'wipe' and 'pick': a front-panel button, a
+   screw turning, a torque driver clicking at its setting, a cloth wiping, a tool picked up. The header button turns them on or off; the choice stays in this browser. */
 const SFX = (() => {
   let ac = null, on = null, noise = null, hiss = null;
   const loops = {};
@@ -97,7 +99,22 @@ const SFX = (() => {
       [src, o, o2].forEach(x => { try { x.stop(now + f * 1.6); } catch (e) { } });
     } };
   }
+  // the fans of a running server spinning down when it powers off: the rush falls in pitch and level over about 3 s
+  function fansDown(a, t) {
+    const src = a.createBufferSource(); src.buffer = air(a); src.loop = true;
+    const lp = a.createBiquadFilter(), g = a.createGain(), o = a.createOscillator(), og = a.createGain();
+    lp.type = 'lowpass'; lp.Q.value = 0.6; lp.frequency.setValueAtTime(2600, t); lp.frequency.exponentialRampToValueAtTime(220, t + 3);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.3, t + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + 3.2);
+    o.type = 'triangle'; o.frequency.setValueAtTime(330, t); o.frequency.exponentialRampToValueAtTime(30, t + 3); og.gain.value = 0.04;
+    src.connect(lp); lp.connect(g); o.connect(og); og.connect(g); g.connect(a.destination);
+    [src, o].forEach(x => { x.start(t); x.stop(t + 3.3); });
+  }
   const KINDS = {
+    button: (a, t) => { tick(a, t, 2800, 2, 0.5); tone(a, t, 620, 300, 0.03, 0.08); },                                                     // a front-panel push button
+    screw: (a, t) => { for (let i = 0; i < 6; i++) tick(a, t + i * 0.075, 2200 + Math.random() * 700, 3, 0.22); },                         // a screwdriver turning a screw: a ratchet of small ticks
+    torque: (a, t) => { tick(a, t, 3900, 4, 0.95); tick(a, t + 0.008, 1800, 2, 0.5); tone(a, t, 1250, 820, 0.03, 0.1); },                 // a torque driver's limiter clicking at its setting
+    wipe: (a, t) => { for (let i = 0; i < 18; i++) tick(a, t + i * 0.022 + Math.random() * 0.008, 600 + Math.random() * 1500, 0.7, 0.05 + Math.random() * 0.04); },   // a cloth wiping
+    pick: (a, t) => { tone(a, t, 300, 200, 0.05, 0.12); tick(a, t, 1500, 1.5, 0.2); },                                                    // a tool picked up or put down
     drive: (a, t) => { tick(a, t, 4300, 2.6, 0.9); tone(a, t + 0.002, 2650, 2550, 0.07, 0.07); tone(a, t, 150, 70, 0.08, 0.25); },          // metal lever latching
     dimm: (a, t) => { tick(a, t, 3000, 2.4, 1.15); tone(a, t, 210, 90, 0.06, 0.22); tick(a, t + 0.045, 3350, 2.4, 1.05); tone(a, t + 0.045, 210, 90, 0.06, 0.2); },   // click-click: both clips
     card: (a, t) => { tone(a, t, 125, 55, 0.14, 0.5); tick(a, t + 0.006, 1900, 2, 0.45); },                                                  // edge going home in the slot
@@ -124,6 +141,7 @@ const SFX = (() => {
       try {
         const a = ctx(); if (!a) return;
         if (kind === 'fans') { stop('fans', 0.2); loops.fans = fans(a, a.currentTime + delay); return; }
+        if (kind === 'fansDown') { if (loops.fans) { stop('fans', 2.4); return; } fansDown(a, a.currentTime + delay); return; }
         (KINDS[kind] || KINDS.drive)(a, a.currentTime + delay);
       } catch (e) { }
     },
@@ -321,7 +339,14 @@ function render() {
   const c = $('#coach'), msg = Sim.coach.msg;
   c.className = msg ? Sim.coach.kind : 'empty';
   c.innerHTML = msg ? `<i class="led" aria-hidden="true"></i><p>${Sim.coach.kind === 'err' ? '<b class="tag">Mistake</b>' : ''}${esc(msg)}</p>` : '';
-  const bt = $('#brieftxt'); if (bt) { bt.textContent = sc.intro || ''; $('#brief').hidden = !sc.intro; }
+  // the briefing panel: the lab's intro, or its work order card while the student works to it (scenario brief(t))
+  const bt = $('#brieftxt'), wo = sc.brief ? sc.brief(T) : null;
+  if (bt) {
+    const bs = $('#brief summary'); if (bs) bs.textContent = wo ? 'Work order' : 'Lab briefing';
+    if (wo) { if (bt.dataset.wo !== wo) { bt.innerHTML = wo; bt.dataset.wo = wo; } bt.className = 'bt bwo'; }
+    else { bt.textContent = sc.intro || ''; bt.dataset.wo = ''; bt.className = 'bt'; }
+    $('#brief').hidden = !(wo || sc.intro);
+  }
   const mine = st.map((s, i) => [s, i]).filter(([s]) => s.view === Sim.view);
   $('#steps').innerHTML = `<h2>${esc(sc.title)}</h2>` +
     (nxt && nxt.view !== Sim.view ? `<div class="elsewhere"><p>Next step is in <b>${esc(Sim.views[nxt.view].title)}</b>.</p>${button('Go there', 'go', nxt.view, true)}</div>` : '') +
@@ -359,12 +384,20 @@ function loadModel(id, scenarioId) {
 Sim.do = (name, arg) => { const f = Sim.actions[name] || CORE[name]; if (f) { Sim.hooks.before.forEach(h => h(name, arg)); f(arg); render(); } };
 CORE.go = id => { if (Sim.views[id]) Sim.view = id; };
 CORE.reset = () => loadScenario(Sim.scenario);
+// a pack may chain one lab into another (the Dell rack lab continues into the processor lab on the same server)
+Sim.startScenario = id => { if (Sim.scenarios[id]) loadScenario(id); };
 CORE.guide = () => { if (Sim.exam) return say('info', 'Guidance stays off in an exam.'); Sim.guide = !Sim.guide; };
 CORE.zoom = () => { Sim.zoom = !Sim.zoom; };
 CORE.sound = () => { SFX.set(!SFX.on()); if (SFX.on()) SFX.play('drive'); };
 document.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (el) Sim.do(el.dataset.act, el.dataset.arg); });
 document.addEventListener('input', e => { const f = e.target.dataset && e.target.dataset.field; if (!f || !T) return; Sim.hooks.before.forEach(h => h('field', f)); if (f.startsWith('mp.')) MemPlan.field(f, e.target.value); else if (f.startsWith('os.')) OSI.field(f.slice(3), e.target.value); else { const h = REG().field; if (h) h(f, e.target.value); } guide(); });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) { e.preventDefault(); Sim.do(e.target.dataset.enter, ''); return; }
+  if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) {
+    // Enter in a field (a console command line, a login box): run its action, then give the redrawn field the keyboard back
+    e.preventDefault(); const f = e.target.dataset.field; Sim.do(e.target.dataset.enter, '');
+    const el = f && document.querySelector(`#stage [data-field="${f}"]`);
+    if (el && document.activeElement !== el && !el.disabled) { el.focus({ preventScroll: true }); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (er) { } }
+    return;
+  }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.hot')) { e.preventDefault(); Sim.do(e.target.dataset.act, e.target.dataset.arg); }
 });

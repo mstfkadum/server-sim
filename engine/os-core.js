@@ -183,6 +183,13 @@ function osBadScreen(t) {
   return `<div class="osx lc"><pre class="lcl">${esc(L.join('\n'))}</pre><div class="osnote">Training note: ${esc(s.media)} is not the image in the work order. Eject it, mount ${esc(OSI.want(t))} and restart the server with a one-time boot from the virtual CD.</div></div>`;
 }
 
+/* ---- the work order card: in the briefing panel under the work, for the whole OS install lab ---- */
+OSI.brief = t => {
+  if (!t.os) return null;
+  const s = osSt(t), h = osH(), m = OS_META[s.wo], w = h.net, linux = m.flavor === 'linux';
+  const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
+  return `<section class="ohw"><div class="wo-n"><span>Work order</span><b>${esc(s.ref || 'OS-' + s.wo.toUpperCase())}</b></div><div class="wo-b"><p class="wo-gb">Install <b>${esc(m.name)}</b> on ${esc(h.product)} S/N ${esc(h.serial)}</p><table class="oht">${row('Image', `<code>${esc(OSI.want(t))}</code>`)}${row('Boot disk', esc(OSI.wantDisk(t).label))}${row('Host name', `<code>${esc(w.host)}</code>`)}${row('Network', `${esc(OSI.wantNic(t).label)} (${esc(OSI.wantNic(t).to)}): <code>${w.ip}/${w.prefix}</code>, gateway <code>${w.gw}</code>, DNS <code>${w.dns}</code>`)}${row('Accounts', linux ? `user <code>${OS_ACC.user}</code> (${OS_ACC.name}, administrator), password <code>${OS_ACC.pw}</code>${s.wo === 'rocky' ? '; root password the same' : ''}` : `root, password <code>${OS_ACC.pw}</code>`)}</table></div></section>`;
+};
 /* ---- the handover check: what the student reads in the OS, against the twin ---- */
 OSI.view = o => Object.assign({
   render(t) {
@@ -190,14 +197,14 @@ OSI.view = o => Object.assign({
     const s = osSt(t), h = osH(), m = OS_META[s.wo], w = h.net, done = s.repOk, linux = m.flavor === 'linux';
     const disks = h.disks(t), dk = d => linux ? d.dev : d.esx;
     const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
-    const card = `<section class="ohw"><div class="wo-n"><span>Work order</span><b>${esc(s.ref || 'OS-' + s.wo.toUpperCase())}</b></div><div class="wo-b"><p class="wo-gb">Install <b>${esc(m.name)}</b> on ${esc(h.product)} S/N ${esc(h.serial)}</p><table class="oht">${row('Image', `<code>${esc(OSI.want(t))}</code>`)}${row('Boot disk', esc(OSI.wantDisk(t).label))}${row('Host name', `<code>${esc(w.host)}</code>`)}${row('Network', `${esc(OSI.wantNic(t).label)} (${esc(OSI.wantNic(t).to)}): <code>${w.ip}/${w.prefix}</code>, gateway <code>${w.gw}</code>, DNS <code>${w.dns}</code>`)}${row('Accounts', linux ? `user <code>${OS_ACC.user}</code> (${OS_ACC.name}, administrator), password <code>${OS_ACC.pw}</code>${s.wo === 'rocky' ? '; root password the same' : ''}` : `root, password <code>${OS_ACC.pw}</code>`)}</table></div></section>`;
+
     const can = OSI.newSys(t) && s.ran.mem && s.ran.cpu && s.ran.disk;
     const f = (k, label, hint) => `<label class="ohf"><span>${label}</span>${osIn('rep.' + k, s.rep[k], { label })}<small>${hint}</small></label>`;
     const form = `<section class="ohc"><h3>Handover check</h3><p class="cap">Read these in the installed system${linux ? ' (lsmem or dmidecode, lscpu, lsblk)' : ' (esxcli hardware memory get, esxcli hardware cpu global get, esxcli storage core device list)'}, not from the work order: the handover records what the OS reports.</p>
 ${can ? `<div class="ohg">${f('mem', 'Memory installed, in GB', linux ? 'lsmem: Total online memory' : 'Physical Memory is in bytes: divide by 1024 three times')}${f('thr', 'Logical CPUs (threads)', linux ? 'lscpu: CPU(s)' : 'CPU Threads')}</div>
 <div class="ohd"><span>Boot disk the OS was installed on</span><div>${disks.map(d => `<button class="${s.rep.disk === dk(d) ? 'on' : ''}" data-act="osRep" data-arg="disk:${esc(dk(d))}" aria-pressed="${s.rep.disk === dk(d)}"><code>${esc(dk(d))}</code><small>${esc(linux ? osSize(d.bytes) : Math.round(d.bytes / 1048576).toLocaleString('en-US') + ' MB')}</small></button>`).join('')}</div></div>
 <p>${done ? '<b class="ohok">Handover recorded: the OS reports what was built.</b>' : osBtn('osRep', 'submit', 'Record the handover', 'pri')}</p>` : `<p class="ohwait">${OSI.newSys(t) ? 'Run the checks in the installed system first: memory, processors and disks.' : 'Install the operating system first.'}</p>`}</section>`;
-    return `<div class="oh cueable">${card}${form}</div>`;
+    return `<div class="oh cueable">${form}</div>`;
   },
   tray(t) {
     if (!t.os) return '';

@@ -198,6 +198,7 @@ aside{grid-area:side;display:flex;flex-direction:column;gap:14px;min-width:0;pos
 .brief[open] summary::before{transform:rotate(45deg) translate(-2px,-1px)}
 .brief summary small{font:400 13px var(--font);color:var(--muted)}
 .brief .bt{margin:0;padding:0 18px 16px 37px;max-width:84ch;font-size:15px;line-height:1.6}
+.brief .bt.bwo{max-width:none;padding:0 16px 16px}
 
 /* side panels: service labels */
 .card{background:var(--label);border:1px solid var(--line);border-radius:8px;padding:15px 16px 16px}
@@ -393,8 +394,8 @@ footer.copy{margin:16px 0 0;font-size:12.5px;color:var(--muted)}
 .mpseg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .mpseg .btn{border:0;border-radius:0;min-height:40px;min-width:46px}.mpseg .btn+.btn{border-left:1px solid var(--line)}
 .mpseg .btn.on{background:var(--uid);color:#FFFFFF;font-weight:700}
-.mpseg .btn.k0::before,.mpseg .btn.k1::before,.mpseg .btn.k2::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:0}
-.mpseg .btn.k0::before{background:#4E5FA6}.mpseg .btn.k1::before{background:#2C7C78}.mpseg .btn.k2::before{background:#8A5A2B}
+.mpseg .btn.k0::before,.mpseg .btn.k1::before,.mpseg .btn.k2::before,.mpseg .btn.k3::before,.mpseg .btn.k4::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:0}
+.mpseg .btn.k0::before{background:#4E5FA6}.mpseg .btn.k1::before{background:#2C7C78}.mpseg .btn.k2::before{background:#8A5A2B}.mpseg .btn.k3::before{background:#7A4B8E}.mpseg .btn.k4::before{background:#3B6E8C}
 .mpbar .btn:disabled{opacity:.45;cursor:not-allowed}
 .mpbar .btn.mpexam{border-color:var(--led);color:var(--amber);background:var(--amber-soft);font-weight:700}
 .mpbar .btn.mpgo{border-color:var(--touch);background:var(--touch);color:var(--touch-ink);font-weight:700}
@@ -410,7 +411,7 @@ footer.copy{margin:16px 0 0;font-size:12.5px;color:var(--muted)}
 .mpfoot{margin-top:8px;font-size:12.5px;color:#C5CCD3}.mpfoot p{margin:4px 0 0}
 .mpleg{display:flex;flex-wrap:wrap;gap:4px 20px}.mpleg span{display:inline-flex;align-items:center;gap:7px}
 .mpleg i{width:13px;height:13px;border-radius:3px;border:2px solid}.mpleg i.m-ok{background:#2F6B4A;border-color:#7CF0A8}.mpleg i.m-part{background:#8A5A00;border-color:#FFC85A}.mpleg i.m-bad{background:#7A1E16;border-color:#FF8A7A}
-.mpleg i.k0{background:#4E5FA6;border-color:#4E5FA6}.mpleg i.k1{background:#2C7C78;border-color:#2C7C78}.mpleg i.k2{background:#8A5A2B;border-color:#8A5A2B}
+.mpleg i.k0{background:#4E5FA6;border-color:#4E5FA6}.mpleg i.k1{background:#2C7C78;border-color:#2C7C78}.mpleg i.k2{background:#8A5A2B;border-color:#8A5A2B}.mpleg i.k3{background:#7A4B8E;border-color:#7A4B8E}.mpleg i.k4{background:#3B6E8C;border-color:#3B6E8C}
 .mps{display:flex;flex-wrap:wrap;gap:4px 22px;margin:0}
 .mps dt{font-size:11.5px;color:var(--muted)}.mps dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
 .mps dd small{font-weight:400;color:var(--muted)}
@@ -502,7 +503,7 @@ footer.copy{margin:16px 0 0;font-size:12.5px;color:var(--muted)}
     <div class="stagewrap"><div id="stage"></div><button class="zoombtn" id="zoombtn" data-act="zoom" aria-pressed="false"></button></div>
     <div id="coach" class="empty" role="status" aria-live="polite"></div>
     <div id="acts"></div>
-    <details id="brief" class="brief" open><summary>Lab briefing</summary><p class="bt" id="brieftxt"></p></details>
+    <details id="brief" class="brief" open><summary>Lab briefing</summary><div class="bt" id="brieftxt"></div></details>
   </section>
   <aside aria-label="Steps and parts"><div class="card" id="steps"></div><div class="card" id="tray"></div></aside>
 </main>
