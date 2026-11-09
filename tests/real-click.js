@@ -29,7 +29,7 @@ const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '.
         if (ans) return { idx, answer: ans };
         if (!cue || !cue.act) return { idx, wait: true };
         const q = `[data-act="${cue.act}"][data-arg="${cue.arg === undefined ? '' : cue.arg}"]`;
-        return { idx, q, act: cue.act, arg: cue.arg };
+        return { idx, q, act: cue.act, arg: cue.arg, drag: cue.drag };
       });
       if (st.idx < 0) break;
       // a stall: the same step asking for the same click again and again (a step may take many different clicks)
@@ -56,6 +56,11 @@ const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '.
       }, sel);
       if (!target) { await p.waitForTimeout(350); continue; }
       if (!target.ok) covered.add(`${st.act || 'nav'}:${st.arg === undefined ? '' : st.arg} on ${target.where}, covered by ${target.top}`);
+      // a drag cue: press on the target and draw its path (picture coordinates) with the mouse
+      if (target.ok && st.drag) {
+        const pts = await p.evaluate(([sel, d]) => { const el = document.querySelector(`#stage svg ${sel}`); let svg = el.ownerSVGElement; while (svg.ownerSVGElement) svg = svg.ownerSVGElement; const m = svg.getScreenCTM(); return d.split(' ').map(q => { const [x, y] = q.split(',').map(Number), r = new DOMPoint(x, y).matrixTransform(m); return [r.x, r.y]; }); }, [sel, st.drag]);
+        await p.mouse.move(pts[0][0], pts[0][1]); await p.mouse.down(); for (const [x, y] of pts.slice(1)) await p.mouse.move(x, y); await p.mouse.up(); clicks++; continue;
+      }
       if (target.ok) await p.mouse.click(target.x, target.y); else await p.evaluate(sel => { const el = document.querySelector(`#stage svg ${sel}`) || document.querySelector(sel); el.dispatchEvent(new MouseEvent('click', { bubbles: true })); }, sel);
       clicks++;
     }

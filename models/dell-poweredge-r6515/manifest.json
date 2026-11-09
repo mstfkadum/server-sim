@@ -1,0 +1,49 @@
+{
+  "id": "dell-poweredge-r6515",
+  "name": "Dell PowerEdge R6515",
+  "vendor": "Dell",
+  "summary": "1U, one AMD EPYC, 10 x 2.5-inch drive bays, iDRAC9",
+  "defaultScenario": "rackin",
+  "files": [
+    "assets.js",
+    "assets-cpu.js",
+    "model.js",
+    "views-rack.js",
+    "views-cpu.js",
+    "views-mem.js",
+    "views-idrac.js",
+    "views-rdist.js",
+    "scenarios.js"
+  ],
+  "scorm": {
+    "title": "Server build trainer: Dell PowerEdge R6515",
+    "passMark": 70,
+    "pointsPerMistake": 10,
+    "lessons": [
+      {
+        "scenario": "rackin",
+        "title": "Lab 1: Rack installation: find the U, fit the rails, lift and secure"
+      },
+      {
+        "scenario": "cpurep",
+        "title": "Lab 2: Replace the processor, reusing its heat sink"
+      },
+      {
+        "scenario": "mem",
+        "title": "Lab 3: Memory installation: choose a supported DDR4 model and populate A1 to A16"
+      },
+      {
+        "scenario": "idrac",
+        "title": "Lab 4: iDRAC setup: NOC check, monitor and keyboard, System Setup (F2), web check"
+      },
+      {
+        "scenario": "ramdist",
+        "title": "Lab 5: RAM Distributor: DDR4 population and capacity planning"
+      },
+      {
+        "scenario": "ramexam",
+        "title": "Lab 6: RAM Distributor Exam: random work-order check"
+      }
+    ]
+  }
+}

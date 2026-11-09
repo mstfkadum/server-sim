@@ -29,7 +29,7 @@ const FILE = 'file://' + path.resolve(process.argv[2] || path.join(__dirname, '.
           const shown = !!document.querySelector('#stage .cuering, #acts .cue, #tray .cue, #stage .cueable .cue');
           if (cue && cue.act && !shown && !window.__retry) { window.__retry = 1; return { idx, wait: true }; }
           window.__retry = 0;
-          if (cue && cue.act) { Sim.do(cue.act, cue.arg === undefined ? '' : String(cue.arg)); return { idx, act: cue.act, arg: cue.arg, shown }; }
+          if (cue && cue.act) { Sim.do(cue.act, cue.drag || (cue.arg === undefined ? '' : String(cue.arg))); return { idx, act: cue.act, arg: cue.arg, shown }; }
           const ans = window.pack && pack.testAnswer && pack.testAnswer(t);
           if (ans) { Sim.do(ans[0], ans[1]); return { idx }; }
           return { idx, wait: true };

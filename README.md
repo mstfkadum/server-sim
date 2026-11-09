@@ -31,34 +31,82 @@ clips to free the old processor, the base cleaned with the HPE-recommended kit, 
 processor clicked in, the module lowered, wires clipped and screws tightened in a cross order; then everything back in
 reverse (baffle, panel, back into the rack, iLO and data cables, power last), power on and check both processors in iLO,
 drawn from HPE's service video frames supplied by the trainer; HPE Labs 3 and 4 are
-the RAM Distributor practice and exam, HPE Labs 5 to 7 the OS installs; more HPE labs are added one by one). More are added as
+the RAM Distributor practice and exam, HPE Labs 5 to 7 the OS installs; more HPE labs are added one by one) and Dell PowerEdge
+R6515 (six labs: Lab 1 the rack installation: pull the information tag on the left control panel and check the Service Tag and
+Express Service Code against the work order, find the U on the rack's numbered strip, fit the ReadyRails sliding rails in
+Dell's order, rear end piece on the rear post then the front with its latch, both at the same U, pull the inner rails out
+until they lock, lower the server rear standoffs first into the J-slots and rotate the front down into the hooks, pull the
+blue slide-release lock tabs and slide it in, then check it: press both rack-ear latches,
+slide it out, push it back until they click; the front of the trainer's server is the photo, the rack and the rails are
+drawings, seen from the front and from above, with close-ups of the end piece on the post, the standoffs dropping into
+the J-slots and the ear latches. Dell Lab 2 replaces the processor, reusing its heat sink. The inside is the trainer's photo from above, rear at
+the top, straightened and its labels painted over, with the air shroud as its own layer that lifts away and the cover
+drawn over it: the lock turned, the release latch in the middle of the cover lifting up, the cover off. The student picks
+the right tool from the manual's list for each job (1/4 inch flat blade or Phillips #2 for the cover lock, Torx T20 for
+the heat sink, a torque driver with a T20 bit set to 12 lbf-in for the force plate, Dell's 12.0 ± 1.0 lbf-in); a wrong
+tool or setting is a mistake. The front LEDs go dark when the server is off. In a drawn close-up of the socket, the
+heat sink cooled and its four captive screws turned in the marked order (1 and 2, 3 and 4, three turns then fully) and
+lifted off, the old grease wiped off the processor lid and the heat sink base, a finger holding the spring-loaded force
+plate down while its screws go 3-2-1 and the plate swinging up on its front hinge, the two blue latches and the rail
+frame rising, the old tray sliding out of the top of the standing frame by its tab, the new one (its specifications shown as it
+comes out of the kit) turned until its gold triangle matches the frame's, then in, frame down, plate
+down and 1-2-3 pressed flat, one thin spiral of grease drawn by the student with the mouse (too much, or off the lid,
+is a mistake: wipe and draw again), the heat sink down and screwed in the same order,
+shroud and cover back, back into the rack. It starts in two ways: from the Lab menu on a server in service (power off,
+both cords out then the cables at the server on the trainer's rear photo, each labelled with its far end, and at the
+end cables then cords last, power on, the expected CMOS checksum message at POST, F2 into System Setup), or straight
+after Lab 1 with its Continue button, on the server just installed, not cabled yet: there it has no unplugging, and it
+ends with the first cabling. On the rear of the rack (as in the Cisco lab: SW01, SW02, MGT01, PDU A and PDU B, the
+R6515's rear photo in U20) the student cables to the work order's cable schedule, peripherals first and the outlets
+last (ISM page 20): iDRAC to MGT01 port 13, Gb 1 to SW01 port 22, Gb 2 to SW02 port 22, then PSU 1 to PDU A outlet 8 and
+PSU 2 to PDU B outlet 8, each cord strapped to its PSU handle (ISM page 93), labels at both ends; then the power button,
+the fans run up, and F2 at POST into System Setup. A wrong port, a port in use, power before data or a cable plugged
+into the wrong kind of port is a mistake; a misplaced cable stays where it went until it is unplugged and moved.
+The run then sets up the iDRAC9, as Dell Lab 4 does on its own (the server installed and cabled, never powered on):
+ask the NOC to confirm the management VLAN for 10.1.23.0/24 on MGT01 port 13; power on; plug a VGA monitor and a USB
+keyboard into the rear panel; watch the boot screens (initializing, the Dell EMC logo, then F2 = System Setup, F10,
+F11, F12 with the iDRAC IPv4 address) and press F2, on the student's own keyboard or by clicking it; in System Setup >
+iDRAC Settings > Network set the NIC enabled and Dedicated, IPv4 enabled, DHCP disabled, 10.1.23.121, gateway 10.1.23.1,
+mask 255.255.255.0, VLAN disabled (the switch port is an access port), and in User Configuration change the root
+password, twice; Finish saves, Finish on the main menu reboots, and the boot screen shows the new address. Tab, Shift+Tab
+and the arrow keys move between fields, Left, Right or Space change a choice, Enter opens or presses, Esc goes back; the
+mouse works too. Last, the laptop browser: https://10.1.23.121, the iDRAC's self-signed certificate, the iDRAC9 login as
+root, and the address checked on the dashboard. The screens are rebuilt from the trainer's photos of a real R6515, with
+invented values. Its work order stays in view under the work, in the panel where other labs show their briefing, as
+in the OS install labs. In that installation run, or as standalone Dell Lab 3 from the Lab menu, the memory goes in across the 16
+DDR4 sockets (A1 to A16, eight channels A to H) on the trainer's top-open photo: unpack the DIMM kit onto the antistatic
+mat, choose one of the five Dell-supported DDR4-3200 models from ISM Table 13 (8 GB 1Rx8, 16 GB 2Rx8, 32 GB 2Rx8, 64 GB
+2Rx4 RDIMM, or 128 GB 8Rx4 LRDIMM; mixing capacities or RDIMM/LRDIMM is rejected), open both socket ejector latches,
+align the edge-connector key notch and press down evenly on both ends in Dell's population order: white release tabs A1
+to A8 first (minimum 4 equal modules in A1 to A4, or 8 in A1 to A8 for all 8 channels at 3200 MT/s), then black release
+tabs A9 to A16 (12 in A1 to A12, or 16 in A1 to A16 at 2933 MT/s), and in standalone Lab 3 verify Memory Settings in System Setup at POST. Dell Labs 5 and 6 are the RAM Distributor practice and exam for the R6515. The
+wrist strap is the Cisco pack's drawing; more Dell labs follow one by one). More are added as
 model packs:
 see `docs/ADDING_A_MODEL.md`.
 
 ## RAM Distributor
 
-A memory planning board and test for both servers, from the vendors' own population rules, with three DIMM sizes per
-server: 16, 32 and 64 GB (Cisco: 16 GB and 32 GB RDIMM, 64 GB LRDIMM; HPE: 16 GB 1Rx8, 32 GB 2Rx8, 64 GB 2Rx4 RDIMM).
-The page is one board. At the top: the processors (1 or 2), the DIMM size, the memory size, **Distribute**, **Clear
+A memory planning board and test for all three servers, from the vendors' own population rules (Cisco: 16 GB and 32 GB RDIMM, 64 GB LRDIMM; HPE: 16 GB 1Rx8, 32 GB 2Rx8, 64 GB 2Rx4 RDIMM; Dell R6515: 8 GB 1Rx8, 16 GB 2Rx8, 32 GB 2Rx8, 64 GB 2Rx4 RDIMM, and 128 GB 8Rx4 LRDIMM).
+The page is one board. At the top: the processors (1 or 2 on dual-socket servers; 1 on the single-socket Dell R6515), the DIMM size, the memory size, **Distribute**, **Clear
 Board**, **Random Exam** and **Verify Distribution**. The memory list offers only the totals the chosen DIMM builds in a
-layout the vendor supports (for example 1 to 12 per CPU on the Cisco; 1, 2, 4, 6, 8, 12 or 16 per processor on the
-HPE), and marks the ones that fill every channel. Below is the population map, drawn as the board sits in the server,
+layout the vendor supports (1 to 12 per CPU on the Cisco; 1, 2, 4, 6, 8, 12 or 16 per processor on the
+HPE; 4, 8, 12 or 16 on the Dell R6515), and marks the ones that fill every channel. Below is the population map, drawn as the board sits in the server,
 seen from above with the rear at the top: on the Cisco the sockets G H, CPU 2, F E C D, CPU 1, B A; on the HPE
 processor 2 on the left with its slots 1 to 8 and 9 to 16 either side of it, then processor 1 the same, numbered as on
-the service label. The student clicks the slots to place the chosen DIMM (a click on a fitted slot with the same size
+the service label; on the Dell R6515 the left bank A3, A13, A4, A14, A7, A15, A8, A16, CPU 1, and the right bank A12, A6, A11, A5, A10, A2, A9, A1. The student clicks the slots to place the chosen DIMM (a click on a fitted slot with the same size
 takes it out). With guidance on, one slot at a time is marked as the next one, in the vendor's order over the server
-(Cisco: A1, E1, B1, F1 ...; HPE: slot 10 of processor 1, then of processor 2, then 3 ...). The side panel shows the vendor's
+(Cisco: A1, E1, B1, F1 ...; HPE: slot 10 of processor 1, then of processor 2, then 3 ...; Dell: white release tabs A1 to A8, then black release tabs A9 to A16). The side panel shows the vendor's
 population table (the slots for each count), in practice and in the exam, so the plan need not be memorised; each
 DIMM clicks into place with a sound (Sound on). Three ways to use it:
 
-- **Planner** (the RAM Distributor in the left menu of any lab) and **Practice** (Cisco Lab 9, HPE Lab 3): the student
+- **Planner** (the RAM Distributor in the left menu of any lab) and **Practice** (Cisco Lab 9, HPE Lab 3, Dell Lab 5): the student
   chooses the setup, places the DIMMs (or presses Distribute to see the layout) and verifies. Verify checks the board
   against the vendor's layout for that setup, and says whether another DIMM size gives the same capacity faster or
   with fewer DIMMs. Random Exam in the planner draws a work order on the board, with Distribute and the marks off until
   it is verified; nothing is recorded.
-- **Exam** (Cisco Lab 10, HPE Lab 4): a random work order from a set of tricky cases (a capacity no single DIMM size
+- **Exam** (Cisco Lab 10, HPE Lab 4, Dell Lab 6): a random work order from a set of tricky cases (a capacity no single DIMM size
   fills, a capacity that cannot be met exactly, a count the vendor does not support, one processor only). Any of the
-  three sizes may be used, mixed where the vendor allows. Guidance, Distribute and the marks on the board are off until
+  supported sizes may be used, mixed where the vendor allows. Guidance, Distribute and the marks on the board are off until
   the student verifies, which submits the layout. The best layout is shown after.
 
 For the exam, best means, in this order: at least the capacity ordered and no more than the least a supported layout gives; then the
@@ -74,6 +122,10 @@ The rules come from the vendors' documents and are shown on the page with their 
   QuickSpecs (DDR5-4800 RDIMMs: 16 GB 1Rx8, 32 GB 2Rx8, 64 GB 2Rx4; 1, 2, 4, 6, 8, 12 or 16 per processor in fixed
   slots; no x4 with x8; two types only with all 16 slots filled, dual rank white and single rank black; speeds for a
   Xeon Gold 6430).
+- Dell: the PowerEdge R6515 Installation and Service Manual Rev. A14, pages 17 and 47–54, Tables 12–16 (single AMD EPYC
+  processor, 8 channels A to H, 16 DDR4 sockets A1 to A16; five DDR4-3200 models: 8 GB 1Rx8, 16 GB 2Rx8, 32 GB 2Rx8,
+  64 GB 2Rx4 RDIMM, and 128 GB 8Rx4 LRDIMM; balanced counts 4, 8, 12 or 16 in numerical order A1 to A16, white release
+  tabs A1–A8 at 3200 MT/s before black release tabs A9–A16 at 2933 MT/s; no mixing capacities or RDIMM/LRDIMM).
 
 Limits: the check is the board's memory summary, not a full power-on with memory training; one processor model per
 server; bandwidth is a model (channels used and their interleaving), not a benchmark. The trainer does not replace the
